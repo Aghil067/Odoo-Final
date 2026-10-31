@@ -83,6 +83,18 @@ import { TechnicianAvailabilityPage } from '../features/technicians/pages/Techni
 import { AssignmentsPage } from '../features/technicians/pages/AssignmentsPage';
 import { MyAssignmentsPage } from '../features/technicians/pages/MyAssignmentsPage';
 
+// Module M07: Warranty Management Pages
+import { WarrantyDashboardPage } from '../features/warranty/pages/WarrantyDashboardPage';
+import { WarrantyPoliciesPage } from '../features/warranty/pages/WarrantyPoliciesPage';
+import { WarrantyPolicyCreatePage } from '../features/warranty/pages/WarrantyPolicyCreatePage';
+import { WarrantyRecordsPage } from '../features/warranty/pages/WarrantyRecordsPage';
+import { WarrantyRegisterPage } from '../features/warranty/pages/WarrantyRegisterPage';
+import { WarrantyDetailsPage } from '../features/warranty/pages/WarrantyDetailsPage';
+import { ExpiringWarrantiesPage } from '../features/warranty/pages/ExpiringWarrantiesPage';
+import { WarrantyClaimsPage } from '../features/warranty/pages/WarrantyClaimsPage';
+import { WarrantyClaimCreatePage } from '../features/warranty/pages/WarrantyClaimCreatePage';
+import { WarrantyClaimDetailsPage } from '../features/warranty/pages/WarrantyClaimDetailsPage';
+
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
   {
@@ -217,14 +229,21 @@ export const router = createBrowserRouter([
             ],
           },
 
-          // Warranty
+          // ── Module M07: Warranty Management ───────────────────────
           {
             element: <ProtectedRoute module="warranty" />,
             children: [
-              {
-                path: '/warranty',
-                element: <PlaceholderPage moduleName="Warranty" moduleKey="warranty" />,
-              },
+              { path: '/warranty', element: <Navigate to="/warranty/dashboard" replace /> },
+              { path: '/warranty/dashboard', element: <WarrantyDashboardPage /> },
+              { path: '/warranty/policies', element: <WarrantyPoliciesPage /> },
+              { path: '/warranty/policies/new', element: <WarrantyPolicyCreatePage /> },
+              { path: '/warranty/records', element: <WarrantyRecordsPage /> },
+              { path: '/warranty/register', element: <WarrantyRegisterPage /> },
+              { path: '/warranty/:id', element: <WarrantyDetailsPage /> },
+              { path: '/warranty/expiring', element: <ExpiringWarrantiesPage /> },
+              { path: '/warranty/claims', element: <WarrantyClaimsPage /> },
+              { path: '/warranty/claims/new', element: <WarrantyClaimCreatePage /> },
+              { path: '/warranty/claims/:id', element: <WarrantyClaimDetailsPage /> },
             ],
           },
 
