@@ -60,6 +60,31 @@ enum ActivityType {
 }
 
 model User {
+ financeGrants FinanceAccessGrant[] @relation("FinanceGrantee")
+ issuedFinanceGrants FinanceAccessGrant[] @relation("FinanceGrantor")
+ financePriceBooks FinancePriceBook[]
+ financeTaxRules FinanceTaxRule[]
+ financeQuotes FinanceQuotation[] @relation("FinanceQuoteCreator")
+ reviewedFinanceQuotes FinanceQuotation[] @relation("FinanceQuoteReviewer")
+ financeOrders FinanceSalesOrder[]
+ financeInvoices FinanceInvoice[] @relation("FinanceInvoiceCreator")
+ issuedFinanceInvoices FinanceInvoice[] @relation("FinanceInvoiceIssuer")
+ financePayments FinancePayment[] @relation("FinancePaymentRecorder")
+ verifiedFinancePayments FinancePayment[] @relation("FinancePaymentVerifier")
+ financeAllocations FinancePaymentAllocation[]
+ financeReleases FinanceAllocationRelease[]
+ financeCredits FinanceCreditNote[] @relation("FinanceCreditCreator")
+ reviewedFinanceCredits FinanceCreditNote[] @relation("FinanceCreditReviewer")
+ financeRefunds FinanceRefund[] @relation("FinanceRefundRequester")
+ reviewedFinanceRefunds FinanceRefund[] @relation("FinanceRefundReviewer")
+ completedFinanceRefunds FinanceRefund[] @relation("FinanceRefundCompleter")
+ financeExpenses FinanceExpense[] @relation("FinanceExpenseCreator")
+ reviewedFinanceExpenses FinanceExpense[] @relation("FinanceExpenseReviewer")
+ financeCharges FinanceServiceCharge[] @relation("FinanceChargeRequester")
+ reviewedFinanceCharges FinanceServiceCharge[] @relation("FinanceChargeReviewer")
+ financeOperations FinanceOperation[]
+ financeHistory FinanceHistory[]
+ financeEvidence FinanceEvidence[]
  serviceAccess ServiceAccessGrant[] @relation("ServiceGrantee")
  issuedServiceAccess ServiceAccessGrant[] @relation("ServiceGrantor")
  serviceTickets ServiceTicket[] @relation("ServiceCreator")
@@ -158,6 +183,16 @@ model Session {
 }
 
 model Customer {
+ financeAccess FinanceAccessGrant[]
+ financeQuotes FinanceQuotation[]
+ financeOrders FinanceSalesOrder[]
+ financeInvoices FinanceInvoice[]
+ financePayments FinancePayment[]
+ financeCredits FinanceCreditNote[]
+ financeRefunds FinanceRefund[]
+ financeExpenses FinanceExpense[]
+ financeCharges FinanceServiceCharge[]
+ financeEvidence FinanceEvidence[]
  serviceTickets ServiceTicket[]
  warrantyRegistrations WarrantyRegistration[]
   installationJobs InstallationJob[]
@@ -192,6 +227,9 @@ model Customer {
 }
 
 model Site {
+ financeQuotes FinanceQuotation[]
+ financeOrders FinanceSalesOrder[]
+ financeInvoices FinanceInvoice[]
  serviceTickets ServiceTicket[]
  warrantyRegistrations WarrantyRegistration[]
   installationJobs InstallationJob[]
@@ -221,6 +259,7 @@ model Site {
 }
 
 model Lead {
+ financeQuotes FinanceQuotation[]
   installationJobs InstallationJob[]
   id                     String       @id @default(uuid()) @db.Uuid
   reference              String       @unique @db.VarChar(40)
@@ -579,6 +618,7 @@ enum SolarReviewDecision {
 }
 
 model SolarComponent {
+ financePrices FinancePriceBookLine[]
  serviceParts ServicePartRequest[]
  warrantyPolicies WarrantyPolicyVersion[]
  warrantyRegistrations WarrantyRegistration[]
@@ -670,6 +710,7 @@ model SolarTemplateRevision {
 }
 
 model SolarConfiguration {
+ financeQuotes FinanceQuotation[]
   installationJobs InstallationJob[]
   stockReservations StockReservation[]
   id             String @id @default(uuid()) @db.Uuid
@@ -732,6 +773,7 @@ model SolarConfiguration {
 }
 
 model BillOfMaterials {
+ financeQuotes FinanceQuotation[]
   installationJobs InstallationJob[]
   stockReservations StockReservation[]
   id             String @id @default(uuid()) @db.Uuid
@@ -790,6 +832,7 @@ model SolarConfigurationHistory {
 }
 
 model SolarConfigurationReview {
+ financeQuotes FinanceQuotation[]
   id             String @id @default(uuid()) @db.Uuid
   configurationId String @db.Uuid
   configuration  SolarConfiguration @relation(fields: [configurationId], references: [id], onDelete: Restrict)
@@ -1112,6 +1155,8 @@ enum InstallationReviewDecision {
   REWORK_REQUIRED
 }
 model InstallationJob {
+ financeOrders FinanceSalesOrder[]
+ financeExpenses FinanceExpense[]
  serviceTickets ServiceTicket[]
  serviceAccess ServiceAccessGrant[]
  servicePlans ServiceMaintenancePlan[]
@@ -1969,6 +2014,8 @@ model ServiceSlaPolicy {
  @@unique([reference,revision])
 }
 model ServiceTicket {
+ financeCharges FinanceServiceCharge[]
+ financeExpenses FinanceExpense[]
  id String @id @default(uuid()) @db.Uuid
  reference String @unique @db.VarChar(60)
  customerId String @db.Uuid
@@ -2241,4 +2288,550 @@ model ServiceMaintenanceOccurrence {
  cancelledAt DateTime? @db.Timestamptz(3)
  cancellationNotes String? @db.VarChar(2000)
  @@unique([planId,dueAt])
+}
+
+enum FinanceCurrency {
+ INR
+ USD
+ EUR
+ GBP
+}
+enum FinanceLineKind {
+ COMPONENT
+ INSTALLATION_LABOR
+ SERVICE_LABOR
+ TRANSPORT
+ OTHER_FEE
+}
+enum FinanceQuoteKind {
+ INSTALLATION
+ SERVICE
+}
+enum FinanceQuoteStatus {
+ DRAFT
+ SUBMITTED_FOR_APPROVAL
+ APPROVED
+ SENT
+ ACCEPTED
+ REJECTED
+ EXPIRED
+ CANCELLED
+ SUPERSEDED
+}
+enum FinanceInvoiceStatus {
+ DRAFT
+ ISSUED
+ VOIDED
+}
+enum FinancePaymentStatus {
+ RECORDED
+ PENDING_VERIFICATION
+ VERIFIED
+ REJECTED
+ REVERSED
+}
+enum FinancePaymentMethod {
+ BANK_TRANSFER
+ UPI
+ CASH
+ CARD
+ CHEQUE
+ OTHER
+}
+enum FinanceApprovalStatus {
+ DRAFT
+ SUBMITTED
+ APPROVED
+ REJECTED
+ RECORDED
+ ISSUED
+ REQUESTED
+ COMPLETED
+ CANCELLED
+}
+enum FinanceEntityKind {
+ QUOTATION
+ ORDER
+ INVOICE
+ PAYMENT
+ CREDIT_NOTE
+ REFUND
+ EXPENSE
+ SERVICE_CHARGE
+}
+enum FinanceEvidenceType {
+ CUSTOMER_ACCEPTANCE
+ PAYMENT_PROOF
+ CREDIT_SUPPORT
+ REFUND_PROOF
+ EXPENSE_RECEIPT
+ SERVICE_CHARGE_SUPPORT
+ OTHER
+}
+model FinanceAccessGrant {
+ id String @id @default(uuid()) @db.Uuid
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ userId String @db.Uuid
+ user User @relation("FinanceGrantee",fields:[userId],references:[id],onDelete:Restrict)
+ grantedById String @db.Uuid
+ grantedBy User @relation("FinanceGrantor",fields:[grantedById],references:[id],onDelete:Restrict)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([customerId,userId])
+}
+model FinancePriceBook {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @db.VarChar(64)
+ revision Int
+ name String @db.VarChar(160)
+ lineCount Int
+ currency FinanceCurrency
+ effectiveFrom DateTime @db.Timestamptz(3)
+ effectiveTo DateTime? @db.Timestamptz(3)
+ discountApprovalPercent Decimal @db.Decimal(7,4)
+ approvalThresholdAmount Decimal @db.Decimal(24,2)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ publishedById String @db.Uuid
+ publishedBy User @relation(fields:[publishedById],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ lines FinancePriceBookLine[]
+ quotations FinanceQuotation[]
+ @@unique([reference,revision])
+}
+model FinancePriceBookLine {
+ id String @id @default(uuid()) @db.Uuid
+ priceBookId String @db.Uuid
+ priceBook FinancePriceBook @relation(fields:[priceBookId],references:[id],onDelete:Restrict)
+ code String @db.VarChar(64)
+ kind FinanceLineKind
+ componentId String? @db.Uuid
+ component SolarComponent? @relation(fields:[componentId],references:[id],onDelete:Restrict)
+ description String @db.VarChar(2000)
+ unit String @db.VarChar(40)
+ unitPrice Decimal @db.Decimal(18,4)
+ estimatedUnitCost Decimal? @db.Decimal(18,4)
+ costSourceNotes String? @db.VarChar(2000)
+ quotations FinanceQuotationLine[]
+ @@unique([priceBookId,code])
+ @@unique([priceBookId,componentId])
+}
+model FinanceTaxRule {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @db.VarChar(64)
+ revision Int
+ name String @db.VarChar(160)
+ currency FinanceCurrency
+ ratePercent Decimal @db.Decimal(7,4)
+ inclusive Boolean
+ jurisdictionNotes String @db.VarChar(3000)
+ effectiveFrom DateTime @db.Timestamptz(3)
+ effectiveTo DateTime? @db.Timestamptz(3)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ publishedById String @db.Uuid
+ publishedBy User @relation(fields:[publishedById],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ quotationLines FinanceQuotationLine[]
+ @@unique([reference,revision])
+}
+model FinanceQuotation {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ seriesId String @default(uuid()) @db.Uuid
+ revision Int @default(1)
+ previousId String? @unique @db.Uuid
+ previous FinanceQuotation? @relation("FinanceQuoteRevision",fields:[previousId],references:[id],onDelete:Restrict)
+ revisions FinanceQuotation[] @relation("FinanceQuoteRevision")
+ commercialKey String @db.VarChar(180)
+ kind FinanceQuoteKind
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ siteId String @db.Uuid
+ site Site @relation(fields:[siteId,customerId],references:[id,customerId],onDelete:Restrict)
+ leadId String @db.Uuid
+ lead Lead @relation(fields:[leadId],references:[id],onDelete:Restrict)
+ configurationId String? @db.Uuid
+ configuration SolarConfiguration? @relation(fields:[configurationId],references:[id],onDelete:Restrict)
+ configurationApprovedVersion Int?
+ configurationReviewId String? @db.Uuid
+ configurationReview SolarConfigurationReview? @relation(fields:[configurationReviewId],references:[id],onDelete:Restrict)
+ bomId String? @db.Uuid
+ bom BillOfMaterials? @relation(fields:[bomId],references:[id],onDelete:Restrict)
+ bomVersion Int?
+ serviceChargeId String? @db.Uuid
+ serviceCharge FinanceServiceCharge? @relation(fields:[serviceChargeId],references:[id],onDelete:Restrict)
+ priceBookId String @db.Uuid
+ priceBook FinancePriceBook @relation(fields:[priceBookId],references:[id],onDelete:Restrict)
+ currency FinanceCurrency
+ sourceSnapshot Json
+ pricingSnapshot Json
+ submittedSnapshot Json?
+ reviewSnapshot Json?
+ subtotal Decimal @db.Decimal(24,2)
+ discountAmount Decimal @db.Decimal(24,2)
+ taxableAmount Decimal @db.Decimal(24,2)
+ taxAmount Decimal @db.Decimal(24,2)
+ totalAmount Decimal @db.Decimal(24,2)
+ estimatedCost Decimal? @db.Decimal(24,2)
+ estimatedMargin Decimal? @db.Decimal(24,2)
+ sensitivePricing Boolean
+ validUntil DateTime @db.Timestamptz(3)
+ terms String @db.VarChar(5000)
+ status FinanceQuoteStatus @default(DRAFT)
+ preparedById String @db.Uuid
+ preparedBy User @relation("FinanceQuoteCreator",fields:[preparedById],references:[id],onDelete:Restrict)
+ approvedById String? @db.Uuid
+ approvedBy User? @relation("FinanceQuoteReviewer",fields:[approvedById],references:[id],onDelete:Restrict)
+ submittedAt DateTime? @db.Timestamptz(3)
+ approvedAt DateTime? @db.Timestamptz(3)
+ sentAt DateTime? @db.Timestamptz(3)
+ acceptedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ lines FinanceQuotationLine[]
+ order FinanceSalesOrder?
+ history FinanceHistory[]
+ evidence FinanceEvidence[]
+ @@unique([seriesId,revision])
+ @@index([customerId,status,createdAt,id])
+}
+model FinanceQuotationLine {
+ id String @id @default(uuid()) @db.Uuid
+ quotationId String @db.Uuid
+ quotation FinanceQuotation @relation(fields:[quotationId],references:[id],onDelete:Restrict)
+ priceBookLineId String @db.Uuid
+ priceBookLine FinancePriceBookLine @relation(fields:[priceBookLineId],references:[id],onDelete:Restrict)
+ taxRuleId String @db.Uuid
+ taxRule FinanceTaxRule @relation(fields:[taxRuleId],references:[id],onDelete:Restrict)
+ position Int
+ kind FinanceLineKind
+ description String @db.VarChar(2000)
+ unit String @db.VarChar(40)
+ quantity Decimal @db.Decimal(12,3)
+ unitPrice Decimal @db.Decimal(18,4)
+ extendedPrice Decimal @db.Decimal(24,2)
+ enteredDiscount Decimal @db.Decimal(24,2)
+ subtotal Decimal @db.Decimal(24,2)
+ discountAmount Decimal @db.Decimal(24,2)
+ taxableAmount Decimal @db.Decimal(24,2)
+ taxAmount Decimal @db.Decimal(24,2)
+ totalAmount Decimal @db.Decimal(24,2)
+ estimatedCost Decimal? @db.Decimal(24,2)
+ taxSnapshot Json
+ invoiceLines FinanceInvoiceLine[]
+ @@unique([quotationId,position])
+ @@unique([quotationId,priceBookLineId])
+}
+model FinanceSalesOrder {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ quotationId String @unique @db.Uuid
+ quotation FinanceQuotation @relation(fields:[quotationId],references:[id],onDelete:Restrict)
+ commercialKey String @unique @db.VarChar(180)
+ installationId String? @db.Uuid
+ installation InstallationJob? @relation(fields:[installationId],references:[id],onDelete:Restrict)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ siteId String @db.Uuid
+ site Site @relation(fields:[siteId,customerId],references:[id,customerId],onDelete:Restrict)
+ currency FinanceCurrency
+ totalAmount Decimal @db.Decimal(24,2)
+ snapshot Json
+ acceptedAt DateTime @db.Timestamptz(3)
+ authorizedById String @db.Uuid
+ authorizedBy User @relation(fields:[authorizedById],references:[id],onDelete:Restrict)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ invoice FinanceInvoice?
+ history FinanceHistory[]
+ @@index([customerId,createdAt,id])
+}
+model FinanceInvoice {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ orderId String @unique @db.Uuid
+ order FinanceSalesOrder @relation(fields:[orderId],references:[id],onDelete:Restrict)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ siteId String @db.Uuid
+ site Site @relation(fields:[siteId,customerId],references:[id,customerId],onDelete:Restrict)
+ currency FinanceCurrency
+ subtotal Decimal @db.Decimal(24,2)
+ discountAmount Decimal @db.Decimal(24,2)
+ taxableAmount Decimal @db.Decimal(24,2)
+ taxAmount Decimal @db.Decimal(24,2)
+ totalAmount Decimal @db.Decimal(24,2)
+ dueAt DateTime @db.Timestamptz(3)
+ notes String @db.VarChar(5000)
+ termsSnapshot Json
+ status FinanceInvoiceStatus @default(DRAFT)
+ createdById String @db.Uuid
+ createdBy User @relation("FinanceInvoiceCreator",fields:[createdById],references:[id],onDelete:Restrict)
+ issuedById String? @db.Uuid
+ issuedBy User? @relation("FinanceInvoiceIssuer",fields:[issuedById],references:[id],onDelete:Restrict)
+ issuedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ lines FinanceInvoiceLine[]
+ allocations FinancePaymentAllocation[]
+ credits FinanceCreditNote[]
+ history FinanceHistory[]
+ @@index([customerId,status,dueAt,id])
+}
+model FinanceInvoiceLine {
+ id String @id @default(uuid()) @db.Uuid
+ invoiceId String @db.Uuid
+ invoice FinanceInvoice @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+ quotationLineId String @db.Uuid
+ quotationLine FinanceQuotationLine @relation(fields:[quotationLineId],references:[id],onDelete:Restrict)
+ position Int
+ snapshot Json
+ subtotal Decimal @db.Decimal(24,2)
+ discountAmount Decimal @db.Decimal(24,2)
+ taxableAmount Decimal @db.Decimal(24,2)
+ taxAmount Decimal @db.Decimal(24,2)
+ totalAmount Decimal @db.Decimal(24,2)
+ @@unique([invoiceId,quotationLineId])
+ @@unique([invoiceId,position])
+}
+model FinancePayment {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ currency FinanceCurrency
+ amount Decimal @db.Decimal(24,2)
+ method FinancePaymentMethod
+ externalReference String @db.VarChar(160)
+ paidAt DateTime @db.Timestamptz(3)
+ notes String @db.VarChar(2000)
+ status FinancePaymentStatus @default(RECORDED)
+ recordedById String @db.Uuid
+ recordedBy User @relation("FinancePaymentRecorder",fields:[recordedById],references:[id],onDelete:Restrict)
+ verifiedById String? @db.Uuid
+ verifiedBy User? @relation("FinancePaymentVerifier",fields:[verifiedById],references:[id],onDelete:Restrict)
+ verifiedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ allocations FinancePaymentAllocation[]
+ refunds FinanceRefund[]
+ evidence FinanceEvidence[]
+ history FinanceHistory[]
+ @@unique([customerId,method,externalReference])
+ @@index([customerId,status,createdAt,id])
+}
+model FinancePaymentAllocation {
+ id String @id @default(uuid()) @db.Uuid
+ paymentId String @db.Uuid
+ payment FinancePayment @relation(fields:[paymentId],references:[id],onDelete:Restrict)
+ invoiceId String @db.Uuid
+ invoice FinanceInvoice @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+ amount Decimal @db.Decimal(24,2)
+ actorId String @db.Uuid
+ actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ operationId String @db.Uuid
+ operation FinanceOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ releases FinanceAllocationRelease[]
+ @@unique([operationId,invoiceId])
+ @@index([paymentId,invoiceId])
+}
+model FinanceAllocationRelease {
+ id String @id @default(uuid()) @db.Uuid
+ allocationId String @db.Uuid
+ allocation FinancePaymentAllocation @relation(fields:[allocationId],references:[id],onDelete:Restrict)
+ amount Decimal @db.Decimal(24,2)
+ actorId String @db.Uuid
+ actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ operationId String @db.Uuid
+ operation FinanceOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ reason String @db.VarChar(2000)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([operationId,allocationId])
+}
+model FinanceCreditNote {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ invoiceId String @db.Uuid
+ invoice FinanceInvoice @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+ currency FinanceCurrency
+ amount Decimal @db.Decimal(24,2)
+ taxAmount Decimal? @db.Decimal(24,2)
+ taxableAmount Decimal? @db.Decimal(24,2)
+ adjustmentReason String @db.VarChar(3000)
+ status FinanceApprovalStatus @default(DRAFT)
+ createdById String @db.Uuid
+ createdBy User @relation("FinanceCreditCreator",fields:[createdById],references:[id],onDelete:Restrict)
+ approvedById String? @db.Uuid
+ approvedBy User? @relation("FinanceCreditReviewer",fields:[approvedById],references:[id],onDelete:Restrict)
+ approvedAt DateTime? @db.Timestamptz(3)
+ issuedAt DateTime? @db.Timestamptz(3)
+ snapshot Json
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ history FinanceHistory[]
+ evidence FinanceEvidence[]
+ @@index([invoiceId,status])
+}
+model FinanceRefund {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ paymentId String @db.Uuid
+ payment FinancePayment @relation(fields:[paymentId],references:[id],onDelete:Restrict)
+ currency FinanceCurrency
+ amount Decimal @db.Decimal(24,2)
+ refundReason String @db.VarChar(3000)
+ status FinanceApprovalStatus @default(REQUESTED)
+ requestedById String @db.Uuid
+ requestedBy User @relation("FinanceRefundRequester",fields:[requestedById],references:[id],onDelete:Restrict)
+ approvedById String? @db.Uuid
+ approvedBy User? @relation("FinanceRefundReviewer",fields:[approvedById],references:[id],onDelete:Restrict)
+ approvedAt DateTime? @db.Timestamptz(3)
+ completedById String? @db.Uuid
+ completedBy User? @relation("FinanceRefundCompleter",fields:[completedById],references:[id],onDelete:Restrict)
+ completedAt DateTime? @db.Timestamptz(3)
+ transferReference String? @unique @db.VarChar(160)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ history FinanceHistory[]
+ evidence FinanceEvidence[]
+ @@index([paymentId,status])
+}
+model FinanceExpense {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ customerId String? @db.Uuid
+ customer Customer? @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ installationId String? @db.Uuid
+ installation InstallationJob? @relation(fields:[installationId],references:[id],onDelete:Restrict)
+ serviceTicketId String? @db.Uuid
+ serviceTicket ServiceTicket? @relation(fields:[serviceTicketId],references:[id],onDelete:Restrict)
+ category String @db.VarChar(60)
+ description String @db.VarChar(3000)
+ vendorOrPayee String @db.VarChar(300)
+ amount Decimal @db.Decimal(24,2)
+ currency FinanceCurrency
+ incurredAt DateTime @db.Timestamptz(3)
+ costBasis String @default("NET_ACTUAL_COST") @db.VarChar(40)
+ status FinanceApprovalStatus @default(DRAFT)
+ createdById String @db.Uuid
+ createdBy User @relation("FinanceExpenseCreator",fields:[createdById],references:[id],onDelete:Restrict)
+ approvedById String? @db.Uuid
+ approvedBy User? @relation("FinanceExpenseReviewer",fields:[approvedById],references:[id],onDelete:Restrict)
+ approvedAt DateTime? @db.Timestamptz(3)
+ recordedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ history FinanceHistory[]
+ evidence FinanceEvidence[]
+ @@index([customerId,status,incurredAt,id])
+}
+model FinanceServiceCharge {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ serviceTicketId String @db.Uuid
+ serviceTicket ServiceTicket @relation(fields:[serviceTicketId],references:[id],onDelete:Restrict)
+ description String @db.VarChar(3000)
+ allowedKinds FinanceLineKind[]
+ proposedAmount Decimal @db.Decimal(24,2)
+ currency FinanceCurrency
+ sourceSnapshot Json
+ status FinanceApprovalStatus @default(DRAFT)
+ requestedById String @db.Uuid
+ requestedBy User @relation("FinanceChargeRequester",fields:[requestedById],references:[id],onDelete:Restrict)
+ approvedById String? @db.Uuid
+ approvedBy User? @relation("FinanceChargeReviewer",fields:[approvedById],references:[id],onDelete:Restrict)
+ approvedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ quotations FinanceQuotation[]
+ evidence FinanceEvidence[]
+ history FinanceHistory[]
+ @@index([customerId,status,createdAt,id])
+}
+model FinanceOperation {
+ allocations FinancePaymentAllocation[]
+ releases FinanceAllocationRelease[]
+ id String @id @default(uuid()) @db.Uuid
+ idempotencyKey String @unique @db.VarChar(100)
+ kind String @db.VarChar(60)
+ requestHash String @db.Char(64)
+ actorId String @db.Uuid
+ actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ actorRole Role
+ reason String @db.VarChar(2000)
+ result Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ history FinanceHistory[]
+}
+model FinanceHistory {
+ id String @id @default(uuid()) @db.Uuid
+ entityKind FinanceEntityKind
+ entityId String @db.Uuid
+ quotationId String? @db.Uuid
+ quotation FinanceQuotation? @relation(fields:[quotationId],references:[id],onDelete:Restrict)
+ orderId String? @db.Uuid
+ order FinanceSalesOrder? @relation(fields:[orderId],references:[id],onDelete:Restrict)
+ invoiceId String? @db.Uuid
+ invoice FinanceInvoice? @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+ paymentId String? @db.Uuid
+ payment FinancePayment? @relation(fields:[paymentId],references:[id],onDelete:Restrict)
+ creditNoteId String? @db.Uuid
+ creditNote FinanceCreditNote? @relation(fields:[creditNoteId],references:[id],onDelete:Restrict)
+ refundId String? @db.Uuid
+ refund FinanceRefund? @relation(fields:[refundId],references:[id],onDelete:Restrict)
+ expenseId String? @db.Uuid
+ expense FinanceExpense? @relation(fields:[expenseId],references:[id],onDelete:Restrict)
+ serviceChargeId String? @db.Uuid
+ serviceCharge FinanceServiceCharge? @relation(fields:[serviceChargeId],references:[id],onDelete:Restrict)
+ actorId String @db.Uuid
+ actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ operationId String? @db.Uuid
+ operation FinanceOperation? @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ version Int
+ event String @db.VarChar(60)
+ fromStatus String? @db.VarChar(40)
+ toStatus String @db.VarChar(40)
+ reason String @db.VarChar(3000)
+ details Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([entityId,version])
+}
+model FinanceEvidence {
+ id String @id @default(uuid()) @db.Uuid
+ ownerVersion Int
+ customerId String? @db.Uuid
+ customer Customer? @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ quotationId String? @db.Uuid
+ quotation FinanceQuotation? @relation(fields:[quotationId],references:[id],onDelete:Restrict)
+ paymentId String? @db.Uuid
+ payment FinancePayment? @relation(fields:[paymentId],references:[id],onDelete:Restrict)
+ creditNoteId String? @db.Uuid
+ creditNote FinanceCreditNote? @relation(fields:[creditNoteId],references:[id],onDelete:Restrict)
+ refundId String? @db.Uuid
+ refund FinanceRefund? @relation(fields:[refundId],references:[id],onDelete:Restrict)
+ expenseId String? @db.Uuid
+ expense FinanceExpense? @relation(fields:[expenseId],references:[id],onDelete:Restrict)
+ serviceChargeId String? @db.Uuid
+ serviceCharge FinanceServiceCharge? @relation(fields:[serviceChargeId],references:[id],onDelete:Restrict)
+ type FinanceEvidenceType
+ fileName String @db.VarChar(160)
+ mimeType String @db.VarChar(100)
+ sizeBytes Int
+ sha256 String @db.Char(64)
+ storageKey String @unique @db.VarChar(100)
+ uploaderId String @db.Uuid
+ uploader User @relation(fields:[uploaderId],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([customerId,createdAt,id])
 }
