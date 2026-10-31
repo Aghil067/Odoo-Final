@@ -6,9 +6,11 @@ export class ApiError extends Error {
 }
 declare module 'axios' { interface AxiosRequestConfig { _retriedRead?:boolean } }
 let csrfToken:string|null=null;
+let lastFailureKey:string|null=null;
 export function setCsrfToken(token:string|null){csrfToken=token;}
 export const SESSION_EXPIRED='solar-session-expired';
 export const API_FAILURE='solar-api-failure';
+export const API_RECOVERED='solar-api-recovered';
 export const apiClient=axios.create({baseURL:import.meta.env.VITE_API_BASE_URL??'/api',withCredentials:true,timeout:25000});
 apiClient.interceptors.request.use(config=>{
   config.headers=AxiosHeaders.from(config.headers);
@@ -18,7 +20,7 @@ apiClient.interceptors.request.use(config=>{
   else if(write&&!(config.data instanceof Blob)&&!(config.data instanceof ArrayBuffer))config.headers.set('Content-Type','application/json');
   return config;
 });
-apiClient.interceptors.response.use(response=>response,async(error:AxiosError<{error?:{message?:string;code?:string;details?:{field:string;message:string}[];requestId?:string}}>)=>{
+apiClient.interceptors.response.use(response=>{const key=(response.config.method??'get')+' '+response.config.url;if(lastFailureKey===key){lastFailureKey=null;if(typeof window!=='undefined')window.dispatchEvent(new Event(API_RECOVERED));}return response;},async(error:AxiosError<{error?:{message?:string;code?:string;details?:{field:string;message:string}[];requestId?:string}}>)=>{
   if(axios.isCancel(error))throw error;
   const status=error.response?.status??0,config=error.config;
   // Mutations and uncertain uploads are never retried. A transient GET may retry once.
@@ -30,7 +32,7 @@ apiClient.interceptors.response.use(response=>response,async(error:AxiosError<{e
   }
   const body=error.response?.data?.error;
   const failure=new ApiError(body?.message??(status===0?'Cannot connect to the API. Check the connection and try again.':`The server returned HTTP ${status}.`),status,body?.code??(status===0?'NETWORK_ERROR':'HTTP_ERROR'),body?.details,body?.requestId);
-  if(typeof window!=='undefined'&&!(status===401&&config?.url==='/auth/me'))window.dispatchEvent(new CustomEvent(API_FAILURE,{detail:failure.message+(failure.details?.map(d=>` ${d.field}: ${d.message}`).join('')??'')}));
+  if(typeof window!=='undefined'&&!(status===401&&config?.url==='/auth/me')){lastFailureKey=(config?.method??'get')+' '+config?.url;window.dispatchEvent(new CustomEvent(API_FAILURE,{detail:failure.message+(failure.details?.map(d=>` ${d.field}: ${d.message}`).join('')??'')}));}
   throw failure;
 });
 export interface Envelope<T>{data:T;pagination?:{page:number;pageSize:number;totalItems:number;totalPages:number};warnings?:unknown[]}
@@ -39,5 +41,5 @@ export async function getPage<T>(url:string,params:Record<string,unknown>={}){co
 export async function postData<T>(url:string,body:unknown){return (await apiClient.post<Envelope<T>>(url,body)).data.data;}
 export async function patchData<T>(url:string,body:unknown){return (await apiClient.patch<Envelope<T>>(url,body)).data.data;}
 export function command(version:number,reason:string,key=crypto.randomUUID()){return {version,reason,idempotencyKey:key};}
-export function unsupported(action:string):never{const message=`${action} is unavailable in the current backend workflow. No changes were saved.`;if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent(API_FAILURE,{detail:message}));throw new ApiError(message,422,'UNSUPPORTED_WORKFLOW');}
+export function unsupported(action:string):never{const message=`${action} is unavailable in the current backend workflow. No changes were saved.`;lastFailureKey=null;if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent(API_FAILURE,{detail:message}));throw new ApiError(message,422,'UNSUPPORTED_WORKFLOW');}
 export async function uploadEvidence<T>(url:string,file:File,params:Record<string,string|number>){return (await apiClient.post<Envelope<T>>(url,file,{params,headers:{'Content-Type':file.type},timeout:60000})).data.data;}

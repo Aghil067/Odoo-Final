@@ -1,6 +1,7 @@
 /**
  * src/components/ui/Input.tsx – Reusable form input with error state.
  */
+import {useId} from 'react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -12,7 +13,8 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function Input({ label, error, hint, leftIcon, required, id, className = '', ...props }: InputProps) {
-  const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  const generatedId=useId();
+  const inputId = id ?? generatedId;
   return (
     <div className="flex flex-col gap-1">
       {label && (

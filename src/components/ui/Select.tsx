@@ -1,6 +1,7 @@
 /**
  * src/components/ui/Select.tsx – Reusable select dropdown.
  */
+import {useId} from 'react';
 import type { SelectHTMLAttributes } from 'react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -13,7 +14,8 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export function Select({ label, error, hint, required, options, placeholder, id, className = '', ...props }: SelectProps) {
-  const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  const generatedId=useId();
+  const inputId = id ?? generatedId;
   return (
     <div className="flex flex-col gap-1">
       {label && (
