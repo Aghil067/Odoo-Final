@@ -1,5 +1,7 @@
 # Foundation + M01 backend publication handoff
 
+Historical M01 handoff: this document describes that publication. M02 now extends the merged backend on its own feature branch; see [M02 handoff](M02_BACKEND_HANDOFF.md). M00 frontend files remain unchanged, and the role/auth alignment work below is still required.
+
 This feature branch preserves the existing M00 React frontend and its commit history. The completed Foundation + M01 backend is added as an independent Node.js project under `backend/`; the existing frontend remains at the repository root. No frontend or backend application functionality was changed during publication.
 
 ## Layout and preserved work

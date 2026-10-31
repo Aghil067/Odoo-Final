@@ -5,6 +5,7 @@ dist/
 !.env.example
 *.log
 coverage/
+.private/
 
 # Local credentials and private keys
 .envrc

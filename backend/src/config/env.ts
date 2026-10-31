@@ -1,6 +1,18 @@
 import 'dotenv/config';
 import { z } from 'zod';
 import { isSupportedCountry } from 'libphonenumber-js';
+import { resolve, relative, isAbsolute, join } from 'node:path';
+import { homedir } from 'node:os';
+
+export function isPublicStoragePath(directory: string): boolean {
+  const target = resolve(directory);
+  // Backend commands run from backend/. Reject the whole frontend repository,
+  // since development servers may serve more than just its public/ directory.
+  return ['..', 'public', 'dist'].some(name => {
+    const path = relative(resolve(name), target);
+    return path === '' || (!path.startsWith('..') && !isAbsolute(path));
+  });
+}
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -14,6 +26,9 @@ const envSchema = z.object({
   SESSION_HOURS: z.coerce.number().int().min(1).max(24).default(8),
   DEFAULT_PHONE_COUNTRY: z.string().default('IN').refine(isSupportedCountry, 'Unsupported phone country'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(3).default(0),
+  SURVEY_STORAGE_ADAPTER: z.literal('local').default('local'),
+  SURVEY_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'survey-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Survey storage must be outside the frontend repository and public/build directories'),
+  SURVEY_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === 'production' && !value.APP_ORIGIN.startsWith('https://')) {
     ctx.addIssue({ code: 'custom', path: ['APP_ORIGIN'], message: 'Production requires HTTPS' });

@@ -1,5 +1,7 @@
 # M01 frontend API contract — for Abisha
 
+M02 integration note: the existing M01 payloads remain unchanged. Changing a lead's site after any survey exists now returns 409 SURVEY_SITE_LOCKED; leaving SURVEY_REQUESTED while a survey is active returns 409 ACTIVE_SURVEY_EXISTS. Follow the [M02 contract](M02_FRONTEND_API_CONTRACT.md) for survey requests/findings/review. Technicians gain narrowly scoped M02 access only; they remain denied general M01 CRM routes.
+
 Backend source root: `E:\Downloads\odoo-hackathon-24hrs`. This is the implemented `/api` contract, not a request to build a second frontend. JSON examples below are illustrative documentation only; no example records or accounts are inserted by the application or during verification.
 
 ## Transport and authentication

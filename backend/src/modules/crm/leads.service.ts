@@ -7,6 +7,7 @@ import { publicUser, type Principal } from '../auth/auth.js';
 import { checkVersion, leadScope, requireCustomer, requireLead, requireSite } from './access.js';
 import { openStatuses } from './customers.service.js';
 import * as v from './validation.js';
+import { activeSurveyStatuses } from '../surveys/policy.js';
 
 export const transitions: Record<LeadStatus, readonly LeadStatus[]> = {
   NEW: ['CONTACTED', 'LOST', 'DISQUALIFIED'],
@@ -87,7 +88,10 @@ export function updateLead(user: Principal, id: string, input: z.infer<typeof v.
     checkVersion(current.version, input.version);
     requireOpen(current.status);
     validateFollowUp(input.nextFollowUpAt);
-    if (input.siteId) await requireSite(tx, current.customerId, input.siteId);
+    if (input.siteId) {
+      await requireSite(tx, current.customerId, input.siteId);
+      if (input.siteId !== current.siteId && await tx.siteSurvey.count({ where: { leadId: id } })) throw new ApiError(409, 'SURVEY_SITE_LOCKED', 'Survey history fixes this lead installation site; create a separate lead for another site');
+    }
     if (['QUALIFIED', 'SURVEY_REQUESTED'].includes(current.status) && input.qualificationNotes === null) {
       throw new ApiError(422, 'QUALIFICATION_REQUIRED', 'Qualified leads must retain qualification notes');
     }
@@ -118,6 +122,7 @@ export function changeStatus(user: Principal, id: string, input: z.infer<typeof 
     const current = await requireLead(tx, user, id, true);
     checkVersion(current.version, input.version);
     if (!transitions[current.status].includes(input.status)) throw new ApiError(409, 'INVALID_TRANSITION', `Cannot move from ${current.status} to ${input.status}`);
+    if (current.status === 'SURVEY_REQUESTED' && await tx.siteSurvey.count({ where: { leadId: id, status: { in: activeSurveyStatuses } } })) throw new ApiError(409, 'ACTIVE_SURVEY_EXISTS', 'Finish or cancel active surveys before changing the lead status');
     if (terminal(current.status) && user.role !== 'ADMIN') throw new ApiError(403, 'REOPEN_FORBIDDEN', 'Only ADMIN may reopen a closed lead');
     if ((terminal(current.status) || terminal(input.status)) && !input.reason) throw new ApiError(422, 'REASON_REQUIRED', 'A reason is required for closing or reopening');
     if (input.status === 'QUALIFIED' && !current.qualificationNotes) throw new ApiError(422, 'QUALIFICATION_REQUIRED', 'Add qualification notes before qualifying');
