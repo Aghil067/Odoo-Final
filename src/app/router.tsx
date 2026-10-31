@@ -73,6 +73,16 @@ import { InstallationSchedulePage } from '../features/installations/pages/Instal
 import { InstallationExecutionPage } from '../features/installations/pages/InstallationExecutionPage';
 import { InstallationCompletionPage } from '../features/installations/pages/InstallationCompletionPage';
 
+// Module M06: Technician Management Pages
+import { TechnicianDashboardPage } from '../features/technicians/pages/TechnicianDashboardPage';
+import { TechniciansPage } from '../features/technicians/pages/TechniciansPage';
+import { TechnicianCreatePage } from '../features/technicians/pages/TechnicianCreatePage';
+import { TechnicianDetailsPage } from '../features/technicians/pages/TechnicianDetailsPage';
+import { TechnicianTeamsPage } from '../features/technicians/pages/TechnicianTeamsPage';
+import { TechnicianAvailabilityPage } from '../features/technicians/pages/TechnicianAvailabilityPage';
+import { AssignmentsPage } from '../features/technicians/pages/AssignmentsPage';
+import { MyAssignmentsPage } from '../features/technicians/pages/MyAssignmentsPage';
+
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
   {
@@ -191,14 +201,19 @@ export const router = createBrowserRouter([
             ],
           },
 
-          // Technicians
+          // ── Module M06: Technician Management ─────────────────────
           {
             element: <ProtectedRoute module="technicians" />,
             children: [
-              {
-                path: '/technicians',
-                element: <PlaceholderPage moduleName="Technicians" moduleKey="technicians" />,
-              },
+              { path: '/technicians', element: <TechniciansPage /> },
+              { path: '/technicians/dashboard', element: <TechnicianDashboardPage /> },
+              { path: '/technicians/new', element: <TechnicianCreatePage /> },
+              { path: '/technicians/:id', element: <TechnicianDetailsPage /> },
+              { path: '/technicians/:id/edit', element: <TechnicianCreatePage /> },
+              { path: '/technicians/teams', element: <TechnicianTeamsPage /> },
+              { path: '/technicians/availability', element: <TechnicianAvailabilityPage /> },
+              { path: '/technicians/assignments', element: <AssignmentsPage /> },
+              { path: '/technicians/my-assignments', element: <MyAssignmentsPage /> },
             ],
           },
 

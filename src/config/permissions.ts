@@ -103,8 +103,8 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
     surveyor:             'view',
     inventory_manager:    'none',
     installation_manager: 'full',
-    technician:           'assigned_only', // own profile only
-    finance_officer:      'none',
+    technician:           'assigned_only', // own profile and own assignments
+    finance_officer:      'view',
     service_manager:      'view',
   },
 
