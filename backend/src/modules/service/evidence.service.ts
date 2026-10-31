@@ -1,0 +1,16 @@
+import {createHash} from 'node:crypto';
+import {Prisma} from '@prisma/client';
+import {z} from 'zod';
+import type {Principal} from '../auth/auth.js';
+import {ApiError} from '../../lib/http.js';
+import type {SurveyStorage} from '../surveys/storage.js';
+import {validateFile} from '../surveys/attachments.service.js';
+import {serviceAtomic,ticket,mutable,coordinate,save,evidenceSelect} from './common.js';
+import {visitIn} from './work.service.js';
+import * as v from './validation.js';
+const hash=(b:Buffer)=>createHash('sha256').update(b).digest('hex');
+export async function preflight(u:Principal,id:string,input:z.infer<typeof v.upload>){return serviceAtomic(async tx=>{const r=await ticket(tx,u,id,input.version);if(r.status==='RESOLVED'&&input.type==='CUSTOMER_ACKNOWLEDGEMENT')coordinate(u);else mutable(r);if(input.visitId)await visitIn(tx,u,r,input.visitId);if(u.role==='TECHNICIAN'&&!input.visitId)throw new ApiError(422,'SERVICE_EVIDENCE_VISIT','Technician upload must identify own current visit');if(await tx.serviceEvidence.count({where:{ticketId:id}})>=100)throw new ApiError(409,'SERVICE_EVIDENCE_LIMIT','At most100 private objects per ticket');});}
+export async function upload(u:Principal,id:string,input:z.infer<typeof v.upload>,bytes:Buffer,mime:string,storage:SurveyStorage){await preflight(u,id,input);const extension=validateFile(bytes,mime,input.fileName,'SUPPORTING_FILE'),receipt=await storage.put(bytes,extension);try{return await serviceAtomic(async tx=>{
+ const r=await ticket(tx,u,id,input.version);if(r.status==='RESOLVED'&&input.type==='CUSTOMER_ACKNOWLEDGEMENT')coordinate(u);else mutable(r);if(input.visitId)await visitIn(tx,u,r,input.visitId);if(u.role==='TECHNICIAN'&&!input.visitId)throw new ApiError(422,'SERVICE_EVIDENCE_VISIT','Own visit required');if(await tx.serviceEvidence.count({where:{ticketId:id}})>=100)throw new ApiError(409,'SERVICE_EVIDENCE_LIMIT','At most100 objects per ticket');const evidence=await tx.serviceEvidence.create({data:{ticketId:id,visitId:input.visitId??null,type:input.type,fileName:input.fileName,mimeType:mime,sizeBytes:bytes.length,sha256:hash(bytes),storageKey:receipt.key,uploaderId:u.id,executionRevision:r.executionRevision},select:evidenceSelect});const current=await save(tx,u,r,{},'EVIDENCE_ADDED',input.reason,{evidenceId:evidence.id,sha256:evidence.sha256});return {evidence,ticketVersion:current.version};
+ });}catch(e){if(e instanceof ApiError||e instanceof Prisma.PrismaClientKnownRequestError&&['P2002','P2003','P2004','P2025','P2034'].includes(e.code))await receipt.discard().catch(()=>console.error(JSON.stringify({event:'service_upload_cleanup_failed'})));else console.error(JSON.stringify({event:'service_upload_reconciliation_required'}));throw e;}}
+export async function download(u:Principal,id:string,evidenceId:string,storage:SurveyStorage){const file=await serviceAtomic(async tx=>{await ticket(tx,u,id);return tx.serviceEvidence.findFirstOrThrow({where:{id:evidenceId,ticketId:id}});}),bytes=await storage.read(file.storageKey);if(bytes.length!==file.sizeBytes||hash(bytes)!==file.sha256)throw new ApiError(409,'STORAGE_INTEGRITY_ERROR','Private evidence integrity differs from recorded metadata');return {bytes,fileName:file.fileName,mimeType:file.mimeType};}
