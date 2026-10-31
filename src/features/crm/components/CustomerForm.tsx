@@ -120,7 +120,7 @@ export function CustomerForm({ initialData, onSubmit, isLoading }: CustomerFormP
             value={formData.phone}
             error={errors.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            placeholder="10-digit mobile number"
+            placeholder="Phone number with country code"
           />
 
           <Input

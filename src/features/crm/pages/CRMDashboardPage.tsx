@@ -52,6 +52,7 @@ export function CRMDashboardPage() {
   const [recentEnquiries, setRecentEnquiries] = useState<EnquirySummary[]>([]);
   const [upcomingFollowUps, setUpcomingFollowUps] = useState<FollowUp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -81,7 +82,7 @@ export function CRMDashboardPage() {
         setRecentEnquiries(recentEnq.data);
         setUpcomingFollowUps(dueFu.data);
       } catch (err) {
-        console.error('Error loading CRM Dashboard data:', err);
+        setError(err instanceof Error?err.message:'Could not load CRM summary');
       } finally {
         setIsLoading(false);
       }
@@ -89,6 +90,7 @@ export function CRMDashboardPage() {
     loadData();
   }, []);
 
+  if(error)return <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700"><h1 className="font-semibold">CRM Dashboard unavailable</h1><p>{error}</p><Button variant="outline" onClick={()=>window.location.reload()}>Retry</Button></div>;
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Top Banner & Quick Actions */}

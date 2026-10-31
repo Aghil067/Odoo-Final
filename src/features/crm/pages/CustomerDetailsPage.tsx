@@ -277,7 +277,7 @@ export function CustomerDetailsPage() {
             <Card>
               <CardHeader title="Solar Sites & Installations" />
               <div className="text-center py-4">
-                <div className="text-3xl font-bold text-slate-800">{customer.numberOfSites}</div>
+                <div className="text-3xl font-bold text-slate-800">{customer.numberOfSites??'Unavailable'}</div>
                 <div className="text-xs text-slate-400 mt-1">Sites Registered</div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded p-2.5 text-xs text-blue-700">

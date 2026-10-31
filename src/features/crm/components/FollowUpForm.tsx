@@ -43,7 +43,7 @@ export function FollowUpForm({
   });
 
   const [leads,setLeads]=useState<EnquirySummary[]>([]);
-  useEffect(()=>{void enquiryService.getByCustomerId(customerId).then(rows=>{setLeads(rows);if(enquiryId){const lead=rows.find(r=>r.id===enquiryId);setFormData(f=>({...f,version:lead?.version}));}});},[customerId,enquiryId]);
+  useEffect(()=>{void enquiryService.getByCustomerId(customerId).then(rows=>{setLeads(rows);if(enquiryId){const lead=rows.find(r=>r.id===enquiryId);setFormData(f=>({...f,version:lead?.version}));}}).catch(e=>setErrors({load:e.message}));},[customerId,enquiryId]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = (): boolean => {
@@ -64,6 +64,7 @@ export function FollowUpForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      {errors.load&&<p role="alert" className="text-red-700">{errors.load}</p>}
       <Select label="Customer Lead" required value={formData.enquiryId??''} options={[{value:'',label:'Select a lead'},...leads.map(l=>({value:l.id,label:l.enquiryId}))]} onChange={e=>setFormData({...formData,enquiryId:e.target.value,version:leads.find(l=>l.id===e.target.value)?.version})}/>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Select
