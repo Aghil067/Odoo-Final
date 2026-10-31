@@ -1,3 +1,4 @@
+import { assertStaffing } from '../technicians/availability.service.js';
 import { z } from 'zod';
 import type { Transaction } from '../../lib/db.js';
 import { ApiError } from '../../lib/http.js';
@@ -16,6 +17,7 @@ export async function checkAppointment(tx: Transaction, surveyorId: string, star
     scheduledAt: { lt: end }, scheduledEndAt: { gt: start },
   }, select: { id: true } });
   if (conflict) throw new ApiError(409, 'SURVEYOR_BUSY', 'Confirmed survey appointments cannot overlap');
+  await assertStaffing(tx,surveyorId,start,end,['SURVEY'],{excludeSurveyId:excludingId});
 }
 
 export function assignSurveyor(user: Principal, id: string, input: z.infer<typeof v.assign>) {
@@ -57,6 +59,7 @@ export function startSurvey(user: Principal, id: string, input: z.infer<typeof v
     const now = new Date();
     if (current.status !== 'SCHEDULED' || !current.scheduledAt || !current.scheduledEndAt || now < current.scheduledAt || now >= current.scheduledEndAt) throw new ApiError(409, 'OUTSIDE_VISIT_WINDOW', 'Start within the confirmed appointment window; reschedule missed visits');
     if (await tx.siteSurvey.count({ where: { id: { not: id }, assignedToId: user.id, status: 'IN_PROGRESS' } })) throw new ApiError(409, 'SURVEYOR_BUSY', 'Complete or cancel the ongoing visit before starting another');
+    await assertStaffing(tx,user.id,current.scheduledAt,current.scheduledEndAt,['SURVEY'],{excludeSurveyId:id});
     return saveSurvey(tx, user, current, { status: 'IN_PROGRESS', visitStatus: 'IN_PROGRESS', startedAt: now }, 'STARTED', input.reason);
   });
 }

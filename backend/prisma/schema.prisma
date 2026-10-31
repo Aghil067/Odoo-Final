@@ -60,6 +60,19 @@ enum ActivityType {
 }
 
 model User {
+ technicianProfile TechnicianProfile?
+ technicianSkills TechnicianSkill[] @relation("TechnicianSkills")
+ verifiedTechnicianSkills TechnicianSkill[] @relation("SkillVerifier")
+ technicianCertifications TechnicianCertification[] @relation("TechnicianCertifications")
+ verifiedTechnicianCertifications TechnicianCertification[] @relation("CertificationVerifier")
+ ledTechnicianTeams TechnicianTeam[] @relation("TeamLead")
+ technicianTeamMemberships TechnicianTeamMembership[]
+ technicianSchedules TechnicianWorkSchedule[]
+ technicianExceptions TechnicianCalendarException[]
+ technicianLeaves TechnicianLeave[] @relation("TechnicianLeaves")
+ reviewedTechnicianLeaves TechnicianLeave[] @relation("LeaveReviewer")
+ workforceActions TechnicianWorkforceAudit[] @relation("WorkforceActor")
+ workforceHistory TechnicianWorkforceAudit[] @relation("WorkforceSubject")
   createdInstallationJobs InstallationJob[] @relation("InstallationCreator")
   coordinatedInstallationJobs InstallationJob[] @relation("InstallationCoordinator")
   installationAssignments InstallationAssignment[]
@@ -1310,4 +1323,187 @@ model InstallationReadiness {
   jobVersion Int
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@unique([jobId,jobVersion])
+}
+
+enum TechnicianEmploymentStatus {
+ ACTIVE
+ INACTIVE
+ ENDED
+}
+enum TechnicianVerification {
+ DECLARED
+ VERIFIED
+ REJECTED
+}
+enum WorkforcePurpose {
+ SURVEY
+ PV_INSTALLATION
+ INVERTER
+ BATTERY
+ COMMISSIONING
+}
+enum TechnicianLeaveStatus {
+ REQUESTED
+ APPROVED
+ REJECTED
+ CANCELLED
+}
+model TechnicianProfile {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @unique @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ employeeCode String @unique @db.VarChar(64)
+ contactPhone String? @db.VarChar(40)
+ emergencyContact Json?
+ baseLocation String? @db.VarChar(300)
+ employmentStatus TechnicianEmploymentStatus @default(ACTIVE)
+ joinedAt DateTime @db.Timestamptz(3)
+ experienceMonths Int @default(0)
+ specializations String[]
+ maxActiveAssignments Int
+ minimumRestMinutes Int
+ enforceScheduling Boolean @default(false)
+ isActive Boolean @default(true)
+ privateNotes String? @db.VarChar(2000)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+model SkillCatalog {
+ id String @id @default(uuid()) @db.Uuid
+ code String @unique @db.VarChar(64)
+ name String @db.VarChar(160)
+ description String? @db.VarChar(2000)
+ mandatoryFor WorkforcePurpose[]
+ minimumLevel Int @default(1)
+ requiresCertification Boolean @default(false)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ skills TechnicianSkill[]
+ certifications TechnicianCertification[]
+}
+model TechnicianSkill {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation("TechnicianSkills",fields:[userId],references:[id],onDelete:Restrict)
+ skillId String @db.Uuid
+ skill SkillCatalog @relation(fields:[skillId],references:[id],onDelete:Restrict)
+ level Int
+ experienceMonths Int
+ verification TechnicianVerification @default(DECLARED)
+ verifiedById String? @db.Uuid
+ verifiedBy User? @relation("SkillVerifier",fields:[verifiedById],references:[id],onDelete:Restrict)
+ verifiedAt DateTime? @db.Timestamptz(3)
+ evidenceReference String? @db.VarChar(500)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ @@unique([userId,skillId])
+}
+model TechnicianCertification {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation("TechnicianCertifications",fields:[userId],references:[id],onDelete:Restrict)
+ skillId String @db.Uuid
+ skill SkillCatalog @relation(fields:[skillId],references:[id],onDelete:Restrict)
+ provider String @db.VarChar(160)
+ certificateNumber String @db.VarChar(160)
+ issuedAt DateTime @db.Timestamptz(3)
+ expiresAt DateTime @db.Timestamptz(3)
+ evidenceReference String @db.VarChar(500)
+ verification TechnicianVerification @default(DECLARED)
+ verifiedById String? @db.Uuid
+ verifiedBy User? @relation("CertificationVerifier",fields:[verifiedById],references:[id],onDelete:Restrict)
+ verifiedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ @@unique([userId,provider,certificateNumber])
+ @@index([userId,skillId,expiresAt])
+}
+model TechnicianTeam {
+ id String @id @default(uuid()) @db.Uuid
+ code String @unique @db.VarChar(64)
+ name String @db.VarChar(160)
+ leadId String? @db.Uuid
+ lead User? @relation("TeamLead",fields:[leadId],references:[id],onDelete:Restrict)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ memberships TechnicianTeamMembership[]
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+model TechnicianTeamMembership {
+ id String @id @default(uuid()) @db.Uuid
+ teamId String @db.Uuid
+ team TechnicianTeam @relation(fields:[teamId],references:[id],onDelete:Restrict)
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ startedAt DateTime @default(now()) @db.Timestamptz(3)
+ endedAt DateTime? @db.Timestamptz(3)
+ @@index([teamId,endedAt])
+ @@index([userId,endedAt])
+}
+model TechnicianWorkSchedule {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ timezone String @db.VarChar(100)
+ effectiveFrom DateTime @db.Timestamptz(3)
+ effectiveTo DateTime @db.Timestamptz(3)
+ isActive Boolean @default(true)
+ shifts TechnicianShift[]
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([userId,effectiveFrom,effectiveTo])
+}
+model TechnicianShift {
+ id String @id @default(uuid()) @db.Uuid
+ scheduleId String @db.Uuid
+ schedule TechnicianWorkSchedule @relation(fields:[scheduleId],references:[id],onDelete:Restrict)
+ weekday Int
+ startMinute Int
+ endMinute Int
+ breakStartMinute Int?
+ breakEndMinute Int?
+ @@unique([scheduleId,weekday,startMinute])
+}
+model TechnicianCalendarException {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ startsAt DateTime @db.Timestamptz(3)
+ endsAt DateTime @db.Timestamptz(3)
+ kind String @db.VarChar(30)
+ reason String @db.VarChar(500)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ @@index([userId,startsAt,endsAt])
+}
+model TechnicianLeave {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation("TechnicianLeaves",fields:[userId],references:[id],onDelete:Restrict)
+ startsAt DateTime @db.Timestamptz(3)
+ endsAt DateTime @db.Timestamptz(3)
+ category String @db.VarChar(30)
+ privateNotes String? @db.VarChar(500)
+ status TechnicianLeaveStatus @default(REQUESTED)
+ reviewedById String? @db.Uuid
+ reviewedBy User? @relation("LeaveReviewer",fields:[reviewedById],references:[id],onDelete:Restrict)
+ reviewedAt DateTime? @db.Timestamptz(3)
+ decisionNotes String? @db.VarChar(500)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([userId,startsAt,endsAt,status])
+}
+model TechnicianWorkforceAudit {
+ id String @id @default(uuid()) @db.Uuid
+ actorId String @db.Uuid
+ actor User @relation("WorkforceActor",fields:[actorId],references:[id],onDelete:Restrict)
+ subjectUserId String? @db.Uuid
+ subjectUser User? @relation("WorkforceSubject",fields:[subjectUserId],references:[id],onDelete:Restrict)
+ teamId String? @db.Uuid
+ entityId String @db.Uuid
+ event String @db.VarChar(60)
+ reason String @db.VarChar(2000)
+ details Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([subjectUserId,createdAt])
+ @@index([teamId,createdAt])
 }

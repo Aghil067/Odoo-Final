@@ -10,6 +10,7 @@ import { crmRouter } from './modules/crm/routes.js';
 import { createSurveyRouter } from './modules/surveys/routes.js';
 import { createInstallationRouter } from './modules/installations/routes.js';
 import { inventoryRouter } from './modules/inventory/routes.js';
+import { technicianRouter } from './modules/technicians/routes.js';
 import { solarRouter } from './modules/solar/routes.js';
 
 export const app = express();
@@ -33,6 +34,7 @@ app.use('/api/surveys', createSurveyRouter());
 app.use('/api/solar', solarRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/installations', createInstallationRouter());
+app.use('/api/technicians', technicianRouter);
 app.use('/api', crmRouter);
 app.use((_req, _res, next) => next(new ApiError(404, 'NOT_FOUND', 'Endpoint not found')));
 app.use(errorHandler);
