@@ -13,7 +13,7 @@ const list=(res:Response,r:{data:unknown;pagination:unknown})=>success(res,r.dat
 const page=v.query.pick({page:true,pageSize:true});
 const warehouseQuery=page.extend(v.query.pick({q:true,active:true}).shape);
 const balanceQuery=page.extend(v.query.pick({warehouseId:true,componentId:true,q:true}).shape);
-const projectQuery=page.extend(v.query.pick({warehouseId:true,configurationId:true}).shape);
+const projectQuery=page.extend(v.query.pick({warehouseId:true,configurationId:true,q:true}).shape);
 inventoryRouter.get('/components',oversight,async(req,res)=>list(res,await read.components(actor(req),page.extend(v.query.pick({q:true,category:true,active:true}).shape).parse(req.query))));
 inventoryRouter.get('/components/:id',oversight,async(req,res)=>success(res,await read.componentDetail(actor(req),v.id.parse(req.params).id)));
 inventoryRouter.get('/fulfillment-configurations',async(req,res)=>list(res,await read.fulfillmentConfigurations(actor(req),page.extend(v.query.pick({q:true}).shape).parse(req.query))));

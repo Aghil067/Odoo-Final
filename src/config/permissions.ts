@@ -49,8 +49,8 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
     inventory_manager:    'none',
     installation_manager: 'view',
     technician:           'none',
-    finance_officer:      'view',
-    service_manager:      'view',
+    finance_officer:      'none',
+    service_manager:      'none',
   },
 
   site_survey: {
@@ -68,22 +68,22 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
     admin:                'full',
     sales_executive:      'view',
     surveyor:             'view',
-    inventory_manager:    'view',
+    inventory_manager:    'none',
     installation_manager: 'full',
-    technician:           'view',
-    finance_officer:      'view',
-    service_manager:      'view',
+    technician:           'assigned_only',
+    finance_officer:      'none',
+    service_manager:      'none',
   },
 
   inventory: {
     admin:                'full',
-    sales_executive:      'none',
+    sales_executive:      'assigned_only',
     surveyor:             'none',
     inventory_manager:    'full',
     installation_manager: 'view',
     technician:           'assigned_only',
     finance_officer:      'view',
-    service_manager:      'view',
+    service_manager:      'none',
   },
 
   installations: {
