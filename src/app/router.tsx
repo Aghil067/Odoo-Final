@@ -95,6 +95,17 @@ import { WarrantyClaimsPage } from '../features/warranty/pages/WarrantyClaimsPag
 import { WarrantyClaimCreatePage } from '../features/warranty/pages/WarrantyClaimCreatePage';
 import { WarrantyClaimDetailsPage } from '../features/warranty/pages/WarrantyClaimDetailsPage';
 
+// Module M08: Service Management Pages
+import { ServiceDashboardPage } from '../features/service/pages/ServiceDashboardPage';
+import { ServiceTicketsPage } from '../features/service/pages/ServiceTicketsPage';
+import { ServiceTicketCreatePage } from '../features/service/pages/ServiceTicketCreatePage';
+import { ServiceTicketDetailsPage } from '../features/service/pages/ServiceTicketDetailsPage';
+import { ServiceTasksPage } from '../features/service/pages/ServiceTasksPage';
+import { ServiceTaskDetailsPage } from '../features/service/pages/ServiceTaskDetailsPage';
+import { ServiceAssignmentsPage } from '../features/service/pages/ServiceAssignmentsPage';
+import { MyServiceTasksPage } from '../features/service/pages/MyServiceTasksPage';
+import { ServiceHistoryPage } from '../features/service/pages/ServiceHistoryPage';
+
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
   {
@@ -247,14 +258,20 @@ export const router = createBrowserRouter([
             ],
           },
 
-          // Service Management
+          // ── Module M08: Service Management ───────────────────────
           {
             element: <ProtectedRoute module="service_management" />,
             children: [
-              {
-                path: '/service',
-                element: <PlaceholderPage moduleName="Service Management" moduleKey="service_management" />,
-              },
+              { path: '/service', element: <Navigate to="/service/dashboard" replace /> },
+              { path: '/service/dashboard', element: <ServiceDashboardPage /> },
+              { path: '/service/tickets', element: <ServiceTicketsPage /> },
+              { path: '/service/tickets/new', element: <ServiceTicketCreatePage /> },
+              { path: '/service/tickets/:id', element: <ServiceTicketDetailsPage /> },
+              { path: '/service/tasks', element: <ServiceTasksPage /> },
+              { path: '/service/tasks/:id', element: <ServiceTaskDetailsPage /> },
+              { path: '/service/assignments', element: <ServiceAssignmentsPage /> },
+              { path: '/service/my-tasks', element: <MyServiceTasksPage /> },
+              { path: '/service/history', element: <ServiceHistoryPage /> },
             ],
           },
 
