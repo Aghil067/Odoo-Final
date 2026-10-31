@@ -60,6 +60,20 @@ enum ActivityType {
 }
 
 model User {
+ warrantyPolicies WarrantyPolicy[] @relation("WarrantyPolicyCreator")
+ publishedWarrantyVersions WarrantyPolicyVersion[] @relation("WarrantyPolicyPublisher")
+ warrantyCaseAccess WarrantyAccessGrant[] @relation("WarrantyCaseWorker")
+ issuedWarrantyAccess WarrantyAccessGrant[] @relation("WarrantyAccessIssuer")
+ warrantyOperations WarrantyOperation[] @relation("WarrantyOperator")
+ warrantyRegistrations WarrantyRegistration[] @relation("WarrantyRegistrant")
+ approvedWarrantyRegistrations WarrantyRegistration[] @relation("WarrantyRegistrationApprover")
+ submittedWarrantyClaims WarrantyClaim[] @relation("WarrantyClaimSubmitter")
+ reviewedWarrantyClaims WarrantyClaim[] @relation("WarrantyClaimReviewer")
+ warrantyEvidence WarrantyEvidence[] @relation("WarrantyEvidenceUploader")
+ warrantyAssessments WarrantyClaimAssessment[] @relation("WarrantyAssessor")
+ warrantyProviderResponses WarrantyProviderResponse[] @relation("WarrantyProviderRecorder")
+ warrantyHistory WarrantyHistory[] @relation("WarrantyHistoryActor")
+ warrantyDecisions WarrantyDecision[] @relation("WarrantyDecisionReviewer")
  technicianProfile TechnicianProfile?
  technicianSkills TechnicianSkill[] @relation("TechnicianSkills")
  verifiedTechnicianSkills TechnicianSkill[] @relation("SkillVerifier")
@@ -128,6 +142,7 @@ model Session {
 }
 
 model Customer {
+ warrantyRegistrations WarrantyRegistration[]
   installationJobs InstallationJob[]
   id              String       @id @default(uuid()) @db.Uuid
   reference       String       @unique @db.VarChar(40)
@@ -160,6 +175,7 @@ model Customer {
 }
 
 model Site {
+ warrantyRegistrations WarrantyRegistration[]
   installationJobs InstallationJob[]
   id            String   @id @default(uuid()) @db.Uuid
   customerId    String   @db.Uuid
@@ -545,6 +561,8 @@ enum SolarReviewDecision {
 }
 
 model SolarComponent {
+ warrantyPolicies WarrantyPolicyVersion[]
+ warrantyRegistrations WarrantyRegistration[]
   installationEquipment InstallationEquipment[]
   inventoryBalances InventoryBalance[]
   inventorySerials InventorySerialUnit[]
@@ -879,6 +897,7 @@ model StockMovement {
   @@index([operationId])
 }
 model InventorySerialUnit {
+ warrantyRegistrations WarrantyRegistration[]
   installationSerial InstallationEquipmentSerial?
   installationIssues InstallationIssue[]
   id String @id @default(uuid()) @db.Uuid
@@ -1073,6 +1092,8 @@ enum InstallationReviewDecision {
   REWORK_REQUIRED
 }
 model InstallationJob {
+ warrantyRegistrations WarrantyRegistration[]
+ warrantyAccessGrants WarrantyAccessGrant[]
   id String @id @default(uuid()) @db.Uuid
   reference String @unique @db.VarChar(60)
   name String @db.VarChar(160)
@@ -1161,6 +1182,7 @@ model InstallationMilestone {
   @@unique([id,jobId])
 }
 model InstallationEquipment {
+ warrantyRegistrations WarrantyRegistration[]
   issues InstallationIssue[]
   id String @id @default(uuid()) @db.Uuid
   jobId String @db.Uuid
@@ -1267,6 +1289,7 @@ model InstallationTest {
   @@index([jobId,type,executionRevision,jobVersion])
 }
 model InstallationCommissioningReview {
+ warrantyRegistrations WarrantyRegistration[]
   id String @id @default(uuid()) @db.Uuid
   jobId String @db.Uuid
   job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
@@ -1506,4 +1529,309 @@ model TechnicianWorkforceAudit {
  createdAt DateTime @default(now()) @db.Timestamptz(3)
  @@index([subjectUserId,createdAt])
  @@index([teamId,createdAt])
+}
+
+enum WarrantyCoverageType {
+ MANUFACTURER_PRODUCT
+ MANUFACTURER_PERFORMANCE
+ INSTALLER_WORKMANSHIP
+ EXTENDED_COVERAGE
+}
+enum WarrantyProviderType {
+ MANUFACTURER
+ INSTALLER
+ THIRD_PARTY
+}
+enum WarrantyDurationUnit {
+ DAYS
+ MONTHS
+ YEARS
+}
+enum WarrantyStartRule {
+ DELIVERY_DATE
+ INSTALLATION_COMPLETION_DATE
+ COMMISSIONING_DATE
+ MANUFACTURER_REGISTRATION_DATE
+ PURCHASE_DATE
+ MANUAL_VERIFIED_DATE
+}
+enum WarrantyRegistrationStatus {
+ DRAFT
+ PENDING_EVIDENCE
+ PENDING_REVIEW
+ ACTIVE
+ REJECTED
+ VOIDED
+}
+enum WarrantyClaimStatus {
+ SUBMITTED
+ UNDER_REVIEW
+ EVIDENCE_REQUIRED
+ ELIGIBLE
+ INELIGIBLE
+ SUBMITTED_TO_PROVIDER
+ PROVIDER_RESPONSE_PENDING
+ APPROVED
+ DENIED
+ RESOLVED
+ CLOSED
+ CANCELLED
+}
+enum WarrantyDocumentType {
+ WARRANTY_CERTIFICATE
+ MANUFACTURER_REGISTRATION
+ PURCHASE_PROOF
+ DELIVERY_PROOF
+ INSTALLATION_COMPLETION
+ CLAIM_PHOTO
+ INVESTIGATION_REPORT
+ PROVIDER_RESPONSE
+ OTHER
+}
+enum WarrantyAssessmentResult {
+ POTENTIALLY_ELIGIBLE
+ NOT_ELIGIBLE
+ NEEDS_EVIDENCE
+ NEEDS_MANUAL_REVIEW
+}
+model WarrantyPolicy {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(64)
+ name String @db.VarChar(160)
+ currentVersion Int @default(1)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ createdById String @db.Uuid
+ createdBy User @relation("WarrantyPolicyCreator",fields:[createdById],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ versions WarrantyPolicyVersion[]
+ registrations WarrantyRegistration[]
+}
+model WarrantyPolicyVersion {
+ id String @id @default(uuid()) @db.Uuid
+ policyId String @db.Uuid
+ policy WarrantyPolicy @relation(fields:[policyId],references:[id],onDelete:Restrict)
+ version Int
+ coverageType WarrantyCoverageType
+ providerType WarrantyProviderType
+ providerName String @db.VarChar(200)
+ applicableComponentId String? @db.Uuid
+ applicableComponent SolarComponent? @relation(fields:[applicableComponentId],references:[id],onDelete:Restrict)
+ applicableCategory SolarComponentCategory?
+ duration Int
+ durationUnit WarrantyDurationUnit
+ startRule WarrantyStartRule
+ coverageDescription String @db.VarChar(5000)
+ exclusions String? @db.VarChar(5000)
+ claimConditions String? @db.VarChar(5000)
+ requiredDocuments WarrantyDocumentType[]
+ claimRequiredDocuments WarrantyDocumentType[]
+ requiresProviderRegistration Boolean
+ registrationDeadlineDays Int?
+ effectiveFrom DateTime @db.Date
+ effectiveTo DateTime? @db.Date
+ backdatingReason String? @db.VarChar(2000)
+ publishedById String @db.Uuid
+ publishedBy User @relation("WarrantyPolicyPublisher",fields:[publishedById],references:[id],onDelete:Restrict)
+ publicationReason String @db.VarChar(2000)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ registrations WarrantyRegistration[]
+ @@unique([policyId,version])
+}
+model WarrantyAccessGrant {
+ id String @id @default(uuid()) @db.Uuid
+ installationId String @db.Uuid
+ installation InstallationJob @relation(fields:[installationId],references:[id],onDelete:Restrict)
+ userId String @db.Uuid
+ user User @relation("WarrantyCaseWorker",fields:[userId],references:[id],onDelete:Restrict)
+ grantedById String @db.Uuid
+ grantedBy User @relation("WarrantyAccessIssuer",fields:[grantedById],references:[id],onDelete:Restrict)
+ isActive Boolean @default(true)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ @@unique([installationId,userId])
+}
+model WarrantyOperation {
+ id String @id @default(uuid()) @db.Uuid
+ idempotencyKey String @unique @db.VarChar(100)
+ kind String @db.VarChar(60)
+ requestHash String @db.Char(64)
+ actorId String @db.Uuid
+ actor User @relation("WarrantyOperator",fields:[actorId],references:[id],onDelete:Restrict)
+ reason String @db.VarChar(2000)
+ result Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ history WarrantyHistory[]
+ decisions WarrantyDecision[]
+}
+model WarrantyRegistration {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ coverageKey String @db.VarChar(200)
+ customerId String @db.Uuid
+ customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+ siteId String @db.Uuid
+ site Site @relation(fields:[siteId,customerId],references:[id,customerId],onDelete:Restrict)
+ installationId String @db.Uuid
+ installation InstallationJob @relation(fields:[installationId],references:[id],onDelete:Restrict)
+ commissioningReviewId String @db.Uuid
+ commissioningReview InstallationCommissioningReview @relation(fields:[commissioningReviewId],references:[id],onDelete:Restrict)
+ policyId String @db.Uuid
+ policy WarrantyPolicy @relation(fields:[policyId],references:[id],onDelete:Restrict)
+ policyVersion Int
+ policyRevision WarrantyPolicyVersion @relation(fields:[policyId,policyVersion],references:[policyId,version],onDelete:Restrict)
+ coverageType WarrantyCoverageType
+ equipmentId String? @db.Uuid
+ equipment InstallationEquipment? @relation(fields:[equipmentId,installationId],references:[id,jobId],onDelete:Restrict)
+ componentId String? @db.Uuid
+ component SolarComponent? @relation(fields:[componentId],references:[id],onDelete:Restrict)
+ serialUnitId String? @db.Uuid
+ serialUnit InventorySerialUnit? @relation(fields:[serialUnitId],references:[id],onDelete:Restrict)
+ coverageQuantity Decimal @db.Decimal(18,3)
+ policySnapshot Json
+ installationSnapshot Json
+ status WarrantyRegistrationStatus @default(DRAFT)
+ proposedStartDate DateTime? @db.Date
+ dateSourceNotes String? @db.VarChar(3000)
+ providerRegistrationReference String? @db.VarChar(160)
+ providerRegisteredAt DateTime? @db.Date
+ verifiedStartDate DateTime? @db.Date
+ expiresAt DateTime? @db.Date
+ registeredById String @db.Uuid
+ registeredBy User @relation("WarrantyRegistrant",fields:[registeredById],references:[id],onDelete:Restrict)
+ approvedById String? @db.Uuid
+ approvedBy User? @relation("WarrantyRegistrationApprover",fields:[approvedById],references:[id],onDelete:Restrict)
+ approvedVersion Int?
+ activatedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ claims WarrantyClaim[]
+ evidence WarrantyEvidence[]
+ history WarrantyHistory[]
+ decisions WarrantyDecision[]
+ @@index([status,expiresAt,id])
+ @@index([installationId,policyId])
+}
+model WarrantyClaim {
+ id String @id @default(uuid()) @db.Uuid
+ reference String @unique @db.VarChar(60)
+ registrationId String @db.Uuid
+ registration WarrantyRegistration @relation(fields:[registrationId],references:[id],onDelete:Restrict)
+ reportedIssue String @db.VarChar(5000)
+ failureDate DateTime? @db.Date
+ claimType String @db.VarChar(100)
+ priority String @db.VarChar(20)
+ status WarrantyClaimStatus @default(SUBMITTED)
+ submittedById String @db.Uuid
+ submittedBy User @relation("WarrantyClaimSubmitter",fields:[submittedById],references:[id],onDelete:Restrict)
+ responsibleReviewerId String? @db.Uuid
+ responsibleReviewer User? @relation("WarrantyClaimReviewer",fields:[responsibleReviewerId],references:[id],onDelete:Restrict)
+ providerClaimReference String? @db.VarChar(160)
+ investigationNotes String? @db.VarChar(5000)
+ finalDecision String? @db.VarChar(20)
+ decisionDate DateTime? @db.Timestamptz(3)
+ resolution String? @db.VarChar(5000)
+ resolvedAt DateTime? @db.Timestamptz(3)
+ version Int @default(1)
+ contentRevision Int @default(1)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ updatedAt DateTime @updatedAt @db.Timestamptz(3)
+ evidence WarrantyEvidence[]
+ history WarrantyHistory[]
+ assessments WarrantyClaimAssessment[]
+ providerResponses WarrantyProviderResponse[]
+ decisions WarrantyDecision[]
+ @@unique([id,registrationId])
+ @@index([status,createdAt,id])
+}
+model WarrantyEvidence {
+ id String @id @default(uuid()) @db.Uuid
+ registrationId String @db.Uuid
+ registration WarrantyRegistration @relation(fields:[registrationId],references:[id],onDelete:Restrict)
+ claimId String? @db.Uuid
+ claim WarrantyClaim? @relation(fields:[claimId,registrationId],references:[id,registrationId],onDelete:Restrict)
+ documentType WarrantyDocumentType
+ fileName String @db.VarChar(160)
+ mimeType String @db.VarChar(100)
+ sizeBytes Int
+ sha256 String @db.Char(64)
+ storageKey String @unique @db.VarChar(100)
+ uploaderId String @db.Uuid
+ uploader User @relation("WarrantyEvidenceUploader",fields:[uploaderId],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@index([registrationId,claimId,createdAt])
+}
+model WarrantyClaimAssessment {
+ id String @id @default(uuid()) @db.Uuid
+ claimId String @db.Uuid
+ claim WarrantyClaim @relation(fields:[claimId],references:[id],onDelete:Restrict)
+ assessorId String @db.Uuid
+ assessor User @relation("WarrantyAssessor",fields:[assessorId],references:[id],onDelete:Restrict)
+ claimVersion Int
+ contentRevision Int
+ result WarrantyAssessmentResult
+ policyVersion Int
+ rulesSnapshot Json
+ findings Json
+ attestation Json
+ notes String @db.VarChar(5000)
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([claimId,claimVersion])
+}
+model WarrantyProviderResponse {
+ id String @id @default(uuid()) @db.Uuid
+ claimId String @db.Uuid
+ claim WarrantyClaim @relation(fields:[claimId],references:[id],onDelete:Restrict)
+ recordedById String @db.Uuid
+ recordedBy User @relation("WarrantyProviderRecorder",fields:[recordedById],references:[id],onDelete:Restrict)
+ providerReference String @db.VarChar(160)
+ response String @db.VarChar(30)
+ respondedAt DateTime @db.Date
+ notes String @db.VarChar(5000)
+ evidenceIds String[] @db.Uuid
+ claimVersion Int
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([claimId,claimVersion])
+}
+model WarrantyHistory {
+ id String @id @default(uuid()) @db.Uuid
+ registrationId String @db.Uuid
+ registration WarrantyRegistration @relation(fields:[registrationId],references:[id],onDelete:Restrict)
+ claimId String? @db.Uuid
+ claim WarrantyClaim? @relation(fields:[claimId,registrationId],references:[id,registrationId],onDelete:Restrict)
+ entityKey String @db.Uuid
+ version Int
+ actorId String @db.Uuid
+ actor User @relation("WarrantyHistoryActor",fields:[actorId],references:[id],onDelete:Restrict)
+ operationId String? @db.Uuid
+ operation WarrantyOperation? @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ event String @db.VarChar(60)
+ fromStatus String? @db.VarChar(40)
+ toStatus String @db.VarChar(40)
+ reason String @db.VarChar(2000)
+ details Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([entityKey,version])
+}
+model WarrantyDecision {
+ id String @id @default(uuid()) @db.Uuid
+ registrationId String @db.Uuid
+ registration WarrantyRegistration @relation(fields:[registrationId],references:[id],onDelete:Restrict)
+ claimId String? @db.Uuid
+ claim WarrantyClaim? @relation(fields:[claimId,registrationId],references:[id,registrationId],onDelete:Restrict)
+ entityKey String @db.Uuid
+ reviewedVersion Int
+ reviewerId String @db.Uuid
+ reviewer User @relation("WarrantyDecisionReviewer",fields:[reviewerId],references:[id],onDelete:Restrict)
+ operationId String @db.Uuid
+ operation WarrantyOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ decision String @db.VarChar(40)
+ notes String @db.VarChar(5000)
+ checklist Json
+ snapshot Json
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([entityKey,reviewedVersion])
 }

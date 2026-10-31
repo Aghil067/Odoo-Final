@@ -1,3 +1,5 @@
+import type {Transaction} from '../../lib/db.js';
+import type {InstallationJob} from '@prisma/client';
 import { z } from 'zod';
 import { ApiError } from '../../lib/http.js';
 import type { Principal } from '../auth/auth.js';
@@ -34,12 +36,14 @@ export function review(user:Principal,id:string,input:z.infer<typeof v.review>){
  const job=await saveJob(tx,user,row,{status:input.decision==='APPROVED'?'COMMISSIONED':'REWORK_REQUIRED',approvedVersion:input.decision==='APPROVED'?row.version:null,commissionedAt:input.decision==='APPROVED'?record.createdAt:null,actualEndAt:input.decision==='APPROVED'?row.actualEndAt:null},'REVIEWED',input.reason,{reviewId:record.id,decision:input.decision,notes:input.notes},input.decision==='REWORK_REQUIRED');
  return {job:publicJob(job),review:record};
 });}
-export function commissioned(user:Principal,id:string){return installationAtomic(async tx=>{
- const row=await requireJob(tx,user,id);
+export function commissioned(user:Principal,id:string){return installationAtomic(async tx=>commissionedRecord(tx,await requireJob(tx,user,id)));}
+// Internal read-only eligibility handoff. Each consuming module must establish its own access scope.
+export async function commissionedRecord(tx:Transaction,row:InstallationJob){
+ const id=row.id;
  if(row.status!=='COMMISSIONED'||row.approvedVersion===null)throw new ApiError(409,'NOT_COMMISSIONED','No approved internal commissioning handoff exists');
  const review=await tx.installationCommissioningReview.findUniqueOrThrow({where:{jobId_jobVersion:{jobId:id,jobVersion:row.approvedVersion}}});
  if(review.decision!=='APPROVED')throw new ApiError(409,'NOT_COMMISSIONED','Persisted review is not approval');
  const data=await tx.installationEquipment.findMany({where:{jobId:id},include:{serials:{where:{installedAt:{not:null}},include:{serialUnit:{select:{serialNumber:true,receivedAt:true,receiptOperationId:true}}}}}});
  const tests=await tx.installationTest.findMany({where:{jobId:id,executionRevision:row.executionRevision},orderBy:{jobVersion:'desc'}});
  return {jobId:id,reference:row.reference,customerId:row.customerId,siteId:row.siteId,leadId:row.leadId,configurationId:row.configurationId,configurationApprovedVersion:row.configurationApprovedVersion,configurationReviewId:row.configurationReviewId,bomId:row.bomId,bomVersion:row.bomVersion,reservationId:row.reservationId,dispatchId:row.dispatchId,dispatchReference:(await tx.stockDispatch.findUniqueOrThrow({where:{id:row.dispatchId}})).reference,commissioningReviewId:review.id,commissioningDate:row.commissionedAt,deliveryConfirmedAt:row.deliveryConfirmedAt,actualWorkStartAt:row.actualStartAt,actualWorkEndAt:row.actualEndAt,equipment:data,testSummary:tests.filter((t,i)=>tests.findIndex(other=>other.type===t.type)===i),outstandingNonblockingIssues:await tx.installationIssue.findMany({where:{jobId:id,status:'OPEN',blocking:false,severity:{in:['LOW','MEDIUM']}}}),completionEvidence:await tx.installationAttachment.findMany({where:{jobId:id,category:'COMPLETION'},select:{id:true,fileName:true,mimeType:true,sizeBytes:true,sha256:true,createdAt:true}}),completionNotes:row.completionNotes,scope:'INTERNAL_COMMISSIONING_NOT_REGULATORY_CERTIFICATION',externalGridAuthorization:'NOT_RECORDED',warrantyStartDate:'NOT_DETERMINED_BY_M05'};
-});}
+}
