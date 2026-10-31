@@ -80,7 +80,18 @@ export function summary(user:Principal,q:Query) {
   });
 }
 export function operations(user:Principal,q:Query) { reader(user);return inventoryAtomic(async tx=>{
- const where:Prisma.InventoryOperationWhereInput={...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
+ const where:Prisma.InventoryOperationWhereInput={kind:q.kind,...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
  return {data:await tx.inventoryOperation.findMany({where,...paging(q),select:{id:true,kind:true,reference:true,actorId:true,reason:true,createdAt:true},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.inventoryOperation.count({where}))};
 });}
 export function operationDetail(user:Principal,id:string) {reader(user);return inventoryAtomic(tx=>tx.inventoryOperation.findUniqueOrThrow({where:{id},select:{id:true,kind:true,reference:true,actorId:true,reason:true,payload:true,result:true,createdAt:true}}));}
+
+const componentLookupSelect={id:true,sku:true,name:true,category:true,unit:true,serializationRequired:true,isActive:true,version:true,manufacturer:true,modelNumber:true} as const;
+export function components(user:Principal,q:Query){reader(user);return inventoryAtomic(async tx=>{
+ const where:Prisma.SolarComponentWhereInput={category:q.category,...(q.active?{isActive:q.active==='true'}:{}),...(q.q?{OR:[{sku:{contains:q.q,mode:'insensitive'}},{name:{contains:q.q,mode:'insensitive'}}]}:{})};
+ return {data:await tx.solarComponent.findMany({where,select:componentLookupSelect,...paging(q),orderBy:[{name:'asc'},{id:'asc'}]}),pagination:pagination(q.page,q.pageSize,await tx.solarComponent.count({where}))};
+});}
+export function componentDetail(user:Principal,id:string){reader(user);return inventoryAtomic(async tx=>{const row=await tx.solarComponent.findUnique({where:{id},select:componentLookupSelect});if(!row)throw new ApiError(404,'NOT_FOUND','Component not found');return row;});}
+export function fulfillmentConfigurations(user:Principal,q:Query){return inventoryAtomic(async tx=>{
+ const where:Prisma.SolarConfigurationWhereInput={AND:[configurationScope(user),{status:'APPROVED',nextRevision:null,...(q.q?{OR:[{reference:{contains:q.q,mode:'insensitive'}},{name:{contains:q.q,mode:'insensitive'}}]}:{})}]};
+ return {data:await tx.solarConfiguration.findMany({where,...paging(q),select:{id:true,reference:true,name:true,approvedVersion:true,customer:{select:{id:true,name:true}},site:{select:{id:true,name:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.solarConfiguration.count({where}))};
+});}

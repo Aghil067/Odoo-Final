@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { InventorySerialState, StockMovementType, StockReservationStatus } from '@prisma/client';
+import { InventorySerialState, StockMovementType, StockReservationStatus, SolarComponentCategory } from '@prisma/client';
 import { uuid, pageQuery } from '../crm/validation.js';
 export const text = (max = 2000) => z.string().trim().min(1).max(max);
 export const id = z.strictObject({ id: uuid });
@@ -21,5 +21,5 @@ export const release = command.extend({ version });
 export const dispatch = command.extend({ reservationId: uuid, version, dispatchedAt: z.iso.datetime({ offset: true }), notes: text().nullable().optional() });
 export const returns = command.extend({ dispatchId: uuid, warehouseId: uuid, lines: z.array(z.strictObject({ dispatchLineId: uuid, quantity, serialIds: uniqueIds.default([]) })).min(1).max(100) });
 export const reorder = command.extend({ componentId: uuid, warehouseId: uuid, version, reorderLevel: amount, reorderQuantity: quantity.nullable() });
-export const query = pageQuery.extend({ q: text(160).optional(), warehouseId: uuid.optional(), componentId: uuid.optional(), configurationId: uuid.optional(), active: z.enum(['true','false']).optional(), state: z.enum(InventorySerialState).optional(), status: z.enum(StockReservationStatus).optional(), type: z.enum(StockMovementType).optional(), operationId: uuid.optional(), dispatchId: uuid.optional(), from: z.iso.datetime({ offset: true }).optional(), to: z.iso.datetime({ offset: true }).optional() }).strict();
+export const query = pageQuery.extend({ q: text(160).optional(), category:z.enum(SolarComponentCategory).optional(),kind:z.enum(['WAREHOUSE_CREATE','WAREHOUSE_UPDATE','RECEIPT','ADJUSTMENT','TRANSFER','REORDER_POLICY','RESERVATION','RESERVATION_RELEASE','RESERVATION_CANCEL','DISPATCH','RETURN']).optional(), warehouseId: uuid.optional(), componentId: uuid.optional(), configurationId: uuid.optional(), active: z.enum(['true','false']).optional(), state: z.enum(InventorySerialState).optional(), status: z.enum(StockReservationStatus).optional(), type: z.enum(StockMovementType).optional(), operationId: uuid.optional(), dispatchId: uuid.optional(), from: z.iso.datetime({ offset: true }).optional(), to: z.iso.datetime({ offset: true }).optional() }).strict();
 export type Query = z.infer<typeof query>;
