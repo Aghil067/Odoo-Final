@@ -1,0 +1,29 @@
+/* src/styles/index.css
+ * ─────────────────────────────────────────────────────────────
+ * Global styles entry point.
+ * Tailwind CSS utility classes are generated from here.
+ *
+ * Custom global styles (scrollbar, focus-visible, etc.) can be
+ * added below the Tailwind directives.
+ */
+
+@import "tailwindcss";
+
+/* ─── Custom global styles ─────────────────────────────────── */
+
+/* Smooth scrollbar */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus-visible ring (keyboard nav) */
+:focus-visible {
+  outline: 2px solid #22c55e;
+  outline-offset: 2px;
+}
+
+/* Remove focus ring for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
