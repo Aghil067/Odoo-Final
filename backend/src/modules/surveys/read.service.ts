@@ -11,10 +11,10 @@ export function listSurveys(user: Principal, query: z.infer<typeof v.list>) {
   return surveyAtomic(async tx => {
     const { page, pageSize, q, status, leadId, siteId, customerId, assignedToId } = query;
     const where: Prisma.SiteSurveyWhereInput = { AND: [surveyScope(user), { status, leadId, siteId, customerId, assignedToId,
-      ...(q ? { OR: [{ reference: { contains: q, mode: 'insensitive' } }, { site: { name: { contains: q, mode: 'insensitive' } } }, { lead: { reference: { contains: q, mode: 'insensitive' } } }] } : {}),
+      ...(q ? { OR: [{ reference: { contains: q, mode: 'insensitive' } }, { site: { name: { contains: q, mode: 'insensitive' } } }, { lead: { reference: { contains: q, mode: 'insensitive' } } }, { customer: { name: { contains: q, mode: 'insensitive' } } }, { site: { city: { contains: q, mode: 'insensitive' } } }] } : {}),
     }] };
     const total = await tx.siteSurvey.count({ where });
-    const data = await tx.siteSurvey.findMany({ where, include: { assignedTo: { select: publicUser } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
+    const data = await tx.siteSurvey.findMany({ where, include: { assignedTo: { select: publicUser }, customer: { select: customerForVisit }, site: { select: siteForVisit } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
     return { data, pagination: pagination(page, pageSize, total) };
   });
 }

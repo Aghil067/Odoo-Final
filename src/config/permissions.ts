@@ -55,13 +55,13 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
 
   site_survey: {
     admin:                'full',
-    sales_executive:      'view',
+    sales_executive:      'full',
     surveyor:             'full',
     inventory_manager:    'none',
     installation_manager: 'view',
     technician:           'assigned_only',
     finance_officer:      'none',
-    service_manager:      'view',
+    service_manager:      'none',
   },
 
   solar_configuration: {

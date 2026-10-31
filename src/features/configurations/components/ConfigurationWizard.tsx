@@ -113,7 +113,7 @@ export function ConfigurationWizard() {
     if (custId) {
       // Query surveys for this customer with approvalStatus = 'approved'
       const res = await surveyService.list({
-        search: cust?.fullName,
+        customerId: custId,
         approvalStatus: 'approved',
       });
       // Further strictly filter for this customer ID & approved status

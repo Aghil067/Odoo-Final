@@ -11,7 +11,6 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  AlertTriangle,
   XCircle,
   PlusCircle,
   ShieldCheck,
@@ -45,6 +44,7 @@ export function SurveyDashboardPage() {
   const [recentSurveys, setRecentSurveys] = useState<Survey[]>([]);
   const [awaitingApproval, setAwaitingApproval] = useState<Survey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -60,7 +60,7 @@ export function SurveyDashboardPage() {
         setRecentSurveys(recentRes.data);
         setAwaitingApproval(pendingApprovalRes.data);
       } catch (err) {
-        console.error('Failed to load survey dashboard data', err);
+        setError(err instanceof Error?err.message:'Could not load survey summary');
       } finally {
         setIsLoading(false);
       }
@@ -68,6 +68,7 @@ export function SurveyDashboardPage() {
     loadData();
   }, []);
 
+  if(error)return <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700"><h1 className="font-semibold">Survey Dashboard unavailable</h1><p>{error}</p><Button variant="outline" onClick={()=>window.location.reload()}>Retry</Button></div>;
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Top Banner & Quick Triggers */}
@@ -88,7 +89,7 @@ export function SurveyDashboardPage() {
             </Link>
           </PermissionGuard>
 
-          <PermissionGuard module="site_survey" require="assigned_only">
+          <PermissionGuard module="site_survey" require="full">
             <Link to="/surveys/new">
               <Button size="sm" variant="primary" leftIcon={<PlusCircle className="w-4 h-4" />}>
                 Create Survey Request
@@ -96,14 +97,6 @@ export function SurveyDashboardPage() {
             </Link>
           </PermissionGuard>
         </div>
-      </div>
-
-      {/* Demo Data Notice */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-center gap-2">
-        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-        <span>
-          <strong>Demo Notice:</strong> All technical survey findings and feasibility ratings reflect development test data.
-        </span>
       </div>
 
       {/* KPI Cards */}
