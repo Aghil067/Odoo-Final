@@ -1,5 +1,7 @@
 # M01 technical documentation
 
+M02 integration update: M02 now extends this backend. See [site survey documentation](M02_SITE_SURVEY_TECHNICAL_DOCUMENTATION.md). M01 remains responsible for customer/site/lead acquisition data; survey findings and technical review live in M02. A lead's site becomes immutable once survey history exists (`SURVEY_SITE_LOCKED`), and an active survey prevents leaving SURVEY_REQUESTED (`ACTIVE_SURVEY_EXISTS`). These checks and the restrictive composite FK preserve survey identity. Other M01 API/session/role behavior below remains unchanged. Earlier future-tense M02 notes describe the original M01 boundary, now implemented by the separate survey module.
+
 ## Architecture and scope
 
 The backend is a single Express 5 application. The public boundary is JSON over `/api`; authenticated CRM controllers delegate business rules to services and services call Prisma inside PostgreSQL transactions. Zod is the input boundary. No competing frontend, survey workflow or unrelated module is included.

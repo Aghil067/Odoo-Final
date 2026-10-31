@@ -7,23 +7,26 @@ import { env } from './config/env.js';
 import { ApiError, errorHandler, requestContext, success } from './lib/http.js';
 import { authRouter, requireTrustedOrigin } from './modules/auth/auth.js';
 import { crmRouter } from './modules/crm/routes.js';
+import { createSurveyRouter } from './modules/surveys/routes.js';
 
 export const app = express();
 app.disable('x-powered-by');
 if (env.TRUST_PROXY_HOPS > 0) app.set('trust proxy', env.TRUST_PROXY_HOPS);
 app.use(requestContext, helmet());
-app.use(cors({ origin: env.APP_ORIGIN, credentials: true, methods: ['GET', 'POST', 'PATCH', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token'], exposedHeaders: ['X-Request-Id'] }));
+app.use(cors({ origin: env.APP_ORIGIN, credentials: true, methods: ['GET', 'POST', 'PATCH', 'PUT', 'OPTIONS'], allowedHeaders: ['Content-Type', 'X-CSRF-Token'], exposedHeaders: ['X-Request-Id'] }));
 app.use(rateLimit({ windowMs: 60_000, limit: 200, standardHeaders: 'draft-8', legacyHeaders: false,
   handler: (_req, _res, next) => next(new ApiError(429, 'RATE_LIMITED', 'Too many requests; try again later')),
 }));
 app.get('/api/health', (_req, res) => success(res, { status: 'ok', module: 'M01' }));
 app.use(requireTrustedOrigin);
 app.use((req, _res, next) => {
-  if (['POST', 'PATCH'].includes(req.method) && !req.is('application/json')) throw new ApiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
+  const surveyUpload = req.method === 'POST' && /^\/api\/surveys\/[a-f0-9-]{36}\/attachments\/?$/i.test(req.path);
+  if (['POST', 'PATCH', 'PUT'].includes(req.method) && !surveyUpload && !req.is('application/json')) throw new ApiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
   next();
 });
 app.use(express.json({ limit: '32kb' }), cookieParser());
 app.use('/api/auth', authRouter);
+app.use('/api/surveys', createSurveyRouter());
 app.use('/api', crmRouter);
 app.use((_req, _res, next) => next(new ApiError(404, 'NOT_FOUND', 'Endpoint not found')));
 app.use(errorHandler);

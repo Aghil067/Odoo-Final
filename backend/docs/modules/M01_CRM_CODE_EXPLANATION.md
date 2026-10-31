@@ -1,5 +1,7 @@
 # M01 Customer & CRM — code explanation
 
+This document records M01's original implementation. M02 is now implemented separately; see [M02 code explanation](M02_SITE_SURVEY_CODE_EXPLANATION.md) for its new files and the two M01 lead guards preserving survey identity/eligibility. Historical implementation-scope statements below refer to M01 alone.
+
 All paths in this document are relative to `E:\Downloads\odoo-hackathon-24hrs`. This module captures genuine customer enquiries, maintains installation addresses and supports sales qualification. It stops at requesting a survey. Qualification expresses commercial interest and readiness; it never asserts roof suitability or technical approval.
 
 ## Source and configuration inventory

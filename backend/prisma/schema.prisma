@@ -74,6 +74,11 @@ model User {
   assignedLeads Lead[] @relation("LeadSalesperson")
   activities   LeadActivity[]
   statusHistory LeadStatusHistory[]
+  requestedSurveys SiteSurvey[] @relation("SurveyRequester")
+  assignedSurveys SiteSurvey[] @relation("Surveyor")
+  surveyEvents SurveyStatusHistory[]
+  surveyReviews SurveyReview[]
+  surveyUploads SurveyAttachment[]
 }
 
 model Session {
@@ -106,6 +111,7 @@ model Customer {
   updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
   sites           Site[]
   leads           Lead[]
+  surveys         SiteSurvey[]
   @@index([normalizedPhone])
   @@index([email])
   @@index([createdById, isArchived])
@@ -135,6 +141,7 @@ model Site {
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
   leads         Lead[]
+  surveys       SiteSurvey[]
   @@unique([id, customerId])
   @@index([customerId, createdAt, id])
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -165,6 +172,8 @@ model Lead {
   updatedAt              DateTime     @updatedAt @db.Timestamptz(3)
   activities             LeadActivity[]
   statusHistory          LeadStatusHistory[]
+  surveys                SiteSurvey[]
+  @@unique([id, siteId, customerId])
   @@index([customerId])
   @@index([siteId, customerId])
   @@index([status, createdAt, id])
@@ -202,4 +211,246 @@ model LeadStatusHistory {
   createdAt  DateTime   @default(now()) @db.Timestamptz(3)
   @@index([leadId, createdAt, id])
   @@index([actorId])
+}
+
+enum SurveyStatus {
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  SUBMITTED
+  REVISION_REQUIRED
+  APPROVED
+  REJECTED
+  CANCELED
+}
+
+enum SurveyVisitStatus {
+  NOT_SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum SurveyEvent {
+  REQUESTED
+  ASSIGNED
+  SCHEDULED
+  RESCHEDULED
+  STARTED
+  UPDATED
+  ROOF_UPDATED
+  ELECTRICAL_UPDATED
+  ATTACHMENT_ADDED
+  SUBMITTED
+  REVIEWED
+  CANCELED
+}
+
+enum RoofType {
+  RCC
+  METAL
+  TILE
+  OTHER
+}
+
+enum ShadingLevel {
+  NONE
+  LOW
+  MODERATE
+  HIGH
+}
+
+enum RoofAccessibility {
+  ACCESSIBLE
+  RESTRICTED
+  UNSAFE
+  UNKNOWN
+}
+
+enum RoofCondition {
+  GOOD
+  FAIR
+  POOR
+  UNKNOWN
+}
+
+enum GridConnection {
+  CONNECTED
+  NOT_CONNECTED
+  UNKNOWN
+}
+
+enum SupplyPhase {
+  SINGLE_PHASE
+  THREE_PHASE
+  UNKNOWN
+}
+
+enum SiteSuitability {
+  UNASSESSED
+  SUITABLE
+  CONDITIONALLY_SUITABLE
+  NOT_SUITABLE
+}
+
+enum SurveyAttachmentCategory {
+  ROOF_PHOTO
+  METER_PHOTO
+  PANEL_PHOTO
+  SITE_LAYOUT
+  SUPPORTING_FILE
+}
+
+enum SurveyReviewDecision {
+  APPROVED
+  REVISION_REQUIRED
+  REJECTED
+}
+
+model SiteSurvey {
+  id                     String @id @default(uuid()) @db.Uuid
+  reference              String @unique @db.VarChar(40)
+  leadId                 String @db.Uuid
+  siteId                 String @db.Uuid
+  customerId             String @db.Uuid
+  lead                   Lead @relation(fields: [leadId, siteId, customerId], references: [id, siteId, customerId], onDelete: Restrict, onUpdate: Restrict)
+  site                   Site @relation(fields: [siteId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
+  customer               Customer @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  assessmentNumber       Int @default(1)
+  previousSurveyId       String? @unique @db.Uuid
+  previousSurvey         SiteSurvey? @relation("SurveyReassessment", fields: [previousSurveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reassessment           SiteSurvey? @relation("SurveyReassessment")
+  requestedById          String @db.Uuid
+  requestedBy            User @relation("SurveyRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  assignedToId           String? @db.Uuid
+  assignedTo             User? @relation("Surveyor", fields: [assignedToId], references: [id], onDelete: Restrict)
+  status                 SurveyStatus @default(REQUESTED)
+  visitStatus            SurveyVisitStatus @default(NOT_SCHEDULED)
+  requestNotes           String @db.VarChar(2000)
+  assignmentNotes        String? @db.VarChar(2000)
+  scheduledAt            DateTime? @db.Timestamptz(3)
+  scheduledEndAt         DateTime? @db.Timestamptz(3)
+  expectedDurationMinutes Int?
+  startedAt              DateTime? @db.Timestamptz(3)
+  submittedAt            DateTime? @db.Timestamptz(3)
+  requestedCapacityKw    Decimal? @db.Decimal(10, 3)
+  recommendedCapacityKw  Decimal? @db.Decimal(10, 3)
+  recommendedSystemType  SystemType @default(UNDECIDED)
+  suitability            SiteSuitability @default(UNASSESSED)
+  infeasibilityReason    String? @db.VarChar(2000)
+  additionalWorkRequired String? @db.VarChar(5000)
+  technicalAssumptions   String? @db.VarChar(5000)
+  feasibilityNotes       String? @db.VarChar(5000)
+  approvedVersion        Int?
+  version                Int @default(1)
+  createdAt              DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime @updatedAt @db.Timestamptz(3)
+  roofAssessment         RoofAssessment?
+  electricalAssessment   ElectricalAssessment?
+  attachments            SurveyAttachment[]
+  history                SurveyStatusHistory[]
+  reviews                SurveyReview[]
+  @@unique([leadId, assessmentNumber])
+  @@index([customerId])
+  @@index([siteId, customerId])
+  @@index([status, createdAt, id])
+  @@index([assignedToId, scheduledAt])
+  @@index([requestedById])
+}
+
+model RoofAssessment {
+  id                     String @id @default(uuid()) @db.Uuid
+  surveyId               String @unique @db.Uuid
+  survey                 SiteSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  roofType               RoofType
+  roofTypeDetails        String? @db.VarChar(2000)
+  usableAreaSqm          Decimal @db.Decimal(12, 3)
+  azimuthDegrees         Decimal @db.Decimal(6, 3)
+  tiltDegrees            Decimal @db.Decimal(5, 3)
+  shadingLevel           ShadingLevel
+  shadingObservations    String @db.VarChar(5000)
+  nearbyObstructions     String @db.VarChar(5000)
+  mountingSpaceSqm       Decimal @db.Decimal(12, 3)
+  accessibility          RoofAccessibility
+  accessibilityNotes     String @db.VarChar(2000)
+  visibleCondition       RoofCondition
+  conditionNotes         String @db.VarChar(5000)
+  mountingConcerns       String @db.VarChar(5000)
+  structuralNotes        String @db.VarChar(5000)
+  specialistVerificationRequired Boolean
+  recommendations        String @db.VarChar(5000)
+  createdAt              DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model ElectricalAssessment {
+  id                     String @id @default(uuid()) @db.Uuid
+  surveyId               String @unique @db.Uuid
+  survey                 SiteSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  gridConnection         GridConnection
+  supplyPhase            SupplyPhase
+  meterDetails           String? @db.VarChar(2000)
+  panelPresent           Boolean
+  panelObservations      String @db.VarChar(5000)
+  approximateCableRunMeters Decimal? @db.Decimal(10, 3)
+  earthingObservations   String @db.VarChar(5000)
+  inverterPlacementOptions String @db.VarChar(5000)
+  batteryPlacementConsiderations String? @db.VarChar(5000)
+  safetyConcerns         String @db.VarChar(5000)
+  safetyVerificationRequired Boolean
+  gridSuitabilityObservations String @db.VarChar(5000)
+  additionalNotes        String @db.VarChar(5000)
+  createdAt              DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model SurveyAttachment {
+  id          String @id @default(uuid()) @db.Uuid
+  surveyId    String @db.Uuid
+  survey      SiteSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  uploaderId  String @db.Uuid
+  uploader    User @relation(fields: [uploaderId], references: [id], onDelete: Restrict)
+  category    SurveyAttachmentCategory
+  fileName    String @db.VarChar(100)
+  mimeType    String @db.VarChar(50)
+  sizeBytes   Int
+  sha256      String @db.Char(64)
+  storageKey  String @unique @db.VarChar(80)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  @@index([surveyId, createdAt, id])
+  @@index([uploaderId])
+}
+
+model SurveyStatusHistory {
+  id            String @id @default(uuid()) @db.Uuid
+  surveyId      String @db.Uuid
+  survey        SiteSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  actorId       String @db.Uuid
+  actor         User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  event         SurveyEvent
+  fromStatus    SurveyStatus?
+  toStatus      SurveyStatus
+  surveyVersion Int
+  reason        String @db.VarChar(2000)
+  details       Json
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  @@index([surveyId, createdAt, id])
+  @@index([actorId])
+}
+
+model SurveyReview {
+  id            String @id @default(uuid()) @db.Uuid
+  surveyId      String @db.Uuid
+  survey        SiteSurvey @relation(fields: [surveyId], references: [id], onDelete: Restrict)
+  reviewerId    String @db.Uuid
+  reviewer      User @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision      SurveyReviewDecision
+  surveyVersion Int
+  notes         String @db.VarChar(5000)
+  checklist     Json
+  snapshot      Json
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([surveyId, surveyVersion])
+  @@index([reviewerId])
 }
