@@ -61,7 +61,7 @@ export function FollowUpsPage() {
     if (!outcomeNote.trim()) return;
     try {
       setIsSubmitting(true);
-      await followUpService.complete(id, { outcomeNote });
+      await followUpService.complete(id, { outcomeNote,version:followUps.find(f=>f.id===id)?.version });
       setCompletingId(null);
       setOutcomeNote('');
       // Refresh list
@@ -77,7 +77,7 @@ export function FollowUpsPage() {
 
   const handleCancel = async (id: string) => {
     try {
-      await followUpService.cancel(id);
+      await followUpService.cancel(id,followUps.find(f=>f.id===id)?.version);
       const res = await followUpService.list({ dateFilter, page, pageSize });
       setFollowUps(res.data);
       setTotal(res.total);

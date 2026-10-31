@@ -12,11 +12,11 @@ export const pageQuery = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 const q = text(160).optional();
-export const customerQuery = pageQuery.extend({ q, type: z.enum(CustomerType).optional(), archived: z.enum(['true', 'false']).default('false') }).strict();
+export const customerQuery = pageQuery.extend({ q, city: text(100).optional(), type: z.enum(CustomerType).optional(), archived: z.enum(['true', 'false']).default('false') }).strict();
 export const leadQuery = pageQuery.extend({
   q, status: z.enum(LeadStatus).optional(), source: z.enum(LeadSource).optional(), priority: z.enum(LeadPriority).optional(),
-  customerId: uuid.optional(), siteId: uuid.optional(), assignedToId: uuid.optional(),
-  followUp: z.enum(['upcoming', 'overdue']).optional(),
+  customerId: uuid.optional(), siteId: uuid.optional(), assignedToId: uuid.optional(), preferredSystemType:z.enum(SystemType).optional(),from:z.iso.datetime({offset:true}).optional(),to:z.iso.datetime({offset:true}).optional(),
+  followUp: z.enum(['upcoming', 'overdue','scheduled','today']).optional(),
 }).strict();
 export const salespersonQuery = pageQuery.extend({ q }).strict();
 export const timelineQuery = pageQuery.strict();
@@ -69,3 +69,5 @@ export const updateLead = leadFields.partial().extend({ siteId: uuid.optional(),
 export const assignLead = z.strictObject({ assignedToId: uuid.nullable(), version: z.number().int().positive() });
 export const changeStatus = z.strictObject({ status: z.enum(LeadStatus), reason: optionalText(2000), version: z.number().int().positive() });
 export const createActivity = z.strictObject({ type: z.enum(ActivityType), description: text(5000) });
+
+export const followUpCommand=z.strictObject({version:z.number().int().positive(),action:z.enum(['SCHEDULE','RESCHEDULE','COMPLETE','CANCEL']),scheduledAt:z.iso.datetime({offset:true}).nullable(),notes:text(3000)});

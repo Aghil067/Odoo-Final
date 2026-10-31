@@ -23,6 +23,7 @@ import { PermissionGuard } from '../../../components/common/PermissionGuard';
 import { customerService } from '../services/customerService';
 import { enquiryService } from '../services/enquiryService';
 import { followUpService } from '../services/followUpService';
+import {CustomerSites} from '../components/CustomerSites';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { FollowUpForm } from '../components/FollowUpForm';
 import type { Customer, CustomerActivity } from '../types/customer.types';
@@ -115,6 +116,7 @@ export function CustomerDetailsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      <CustomerSites customerId={customer.id}/>
       {/* Top Bar Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div className="flex items-center gap-3">

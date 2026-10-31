@@ -9,11 +9,9 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Card } from '../../../components/ui/Card';
-import type { Customer, CustomerFormData, CustomerType, CustomerSource, CustomerStatus } from '../types/customer.types';
+import type { Customer, CustomerFormData, CustomerType } from '../types/customer.types';
 import {
   CUSTOMER_TYPE_LABELS,
-  CUSTOMER_SOURCE_LABELS,
-  CUSTOMER_STATUS_LABELS,
 } from '../types/customer.types';
 
 interface CustomerFormProps {
@@ -26,6 +24,7 @@ export function CustomerForm({ initialData, onSubmit, isLoading }: CustomerFormP
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<CustomerFormData>({
+    version:initialData?.version,
     customerType: initialData?.customerType ?? 'individual',
     fullName: initialData?.fullName ?? '',
     contactPerson: initialData?.contactPerson ?? '',
@@ -59,12 +58,8 @@ export function CustomerForm({ initialData, onSubmit, isLoading }: CustomerFormP
 
     if (!formData.phone.trim()) {
       errs.phone = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(formData.phone.replace(/[\s-]/g, ''))) {
-      errs.phone = 'Please enter a valid 10-digit phone number';
-    }
-
-    if (formData.alternatePhone?.trim() && !/^\d{10}$/.test(formData.alternatePhone.replace(/[\s-]/g, ''))) {
-      errs.alternatePhone = 'Please enter a valid 10-digit alternate phone number';
+    } else if (!/^\+?[\d ()-]{7,25}$/.test(formData.phone)) {
+      errs.phone = 'Enter a valid phone number, preferably including its country code';
     }
 
     if (formData.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
@@ -81,10 +76,7 @@ export function CustomerForm({ initialData, onSubmit, isLoading }: CustomerFormP
     await onSubmit(formData);
   };
 
-  const typeOptions = Object.entries(CUSTOMER_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v }));
-  const sourceOptions = Object.entries(CUSTOMER_SOURCE_LABELS).map(([k, v]) => ({ value: k, label: v }));
-  const statusOptions = Object.entries(CUSTOMER_STATUS_LABELS).map(([k, v]) => ({ value: k, label: v }));
-
+  const typeOptions = Object.entries(CUSTOMER_TYPE_LABELS).filter(([k])=>k!=='organization').map(([k, v]) => ({ value: k, label: v }));
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* Basic Details */}
@@ -132,15 +124,6 @@ export function CustomerForm({ initialData, onSubmit, isLoading }: CustomerFormP
           />
 
           <Input
-            label="Alternate Phone Number"
-            type="tel"
-            value={formData.alternatePhone}
-            error={errors.alternatePhone}
-            onChange={(e) => setFormData({ ...formData, alternatePhone: e.target.value })}
-            placeholder="Optional 10-digit number"
-          />
-
-          <Input
             label="Email Address"
             type="email"
             value={formData.email}
@@ -149,80 +132,16 @@ export function CustomerForm({ initialData, onSubmit, isLoading }: CustomerFormP
             placeholder="name@example.com"
           />
 
-          {formData.customerType !== 'individual' && (
-            <Input
-              label="GST Number"
-              value={formData.gstNumber}
-              onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
-              placeholder="e.g. 32AAAAA0000A1Z5"
-            />
-          )}
-
-          <Select
-            label="Customer Status"
-            options={statusOptions}
-            value={formData.status}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value as CustomerStatus })}
-          />
         </div>
       </Card>
 
-      {/* Address Details */}
-      <Card>
-        <h3 className="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-100">
-          Address Details
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Address Line 1"
-            value={formData.addressLine1}
-            onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
-            placeholder="House / Building / Street"
-          />
-          <Input
-            label="Address Line 2"
-            value={formData.addressLine2}
-            onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
-            placeholder="Apartment, suite, unit, etc."
-          />
-          <Input
-            label="City"
-            value={formData.city}
-            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-            placeholder="e.g. Kochi"
-          />
-          <Input
-            label="State"
-            value={formData.state}
-            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-            placeholder="e.g. Kerala"
-          />
-          <Input
-            label="PIN Code"
-            value={formData.pinCode}
-            onChange={(e) => setFormData({ ...formData, pinCode: e.target.value })}
-            placeholder="6-digit PIN code"
-          />
-          <Input
-            label="Country"
-            value={formData.country}
-            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-          />
-        </div>
-      </Card>
-
+      <p className="text-sm text-slate-500">Installation addresses belong to customer sites. Add a site after saving this customer.</p>
       {/* Additional Details */}
       <Card>
         <h3 className="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-100">
           Additional Information
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Customer Source"
-            options={sourceOptions}
-            value={formData.source}
-            onChange={(e) => setFormData({ ...formData, source: e.target.value as CustomerSource })}
-          />
           <div className="md:col-span-2">
             <Textarea
               label="Notes"

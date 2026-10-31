@@ -13,12 +13,13 @@ export type EnquiryStatus =
   | 'survey_completed'
   | 'quotation_sent'
   | 'won'
-  | 'lost';
+  | 'lost'
+  | 'disqualified';
 
-export type SystemType = 'on_grid' | 'off_grid';
+export type SystemType = 'on_grid' | 'off_grid' | 'undecided';
 export type PropertyType = 'residential' | 'commercial';
-export type CapacityOption = '1kw' | '2kw' | '3kw' | '4kw' | '5kw' | 'custom';
-export type EnquiryPriority = 'low' | 'medium' | 'high';
+export type CapacityOption = '1kw' | '2kw' | '3kw' | '4kw' | '5kw' | 'custom' | 'unspecified';
+export type EnquiryPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type LeadSource =
   | 'website'
   | 'phone_call'
@@ -31,6 +32,8 @@ export type LeadSource =
 
 export interface Enquiry {
   id: string;
+  version?:number;
+  siteId?:string;
   enquiryId: string;            // Human-readable e.g. ENQ-0001
   customerId: string;
   customerName: string;
@@ -41,9 +44,9 @@ export interface Enquiry {
   systemType: SystemType;
   capacityOption: CapacityOption;
   customCapacity?: string;      // when capacityOption === 'custom'
-  propertyType: PropertyType;
+  propertyType: PropertyType | null;
   installationLocation: string;
-  monthlyElectricityBill?: number;
+  monthlyElectricityBill?: string | number;
   requirements?: string;
 
   // Sales
@@ -65,6 +68,8 @@ export interface Enquiry {
 
 export interface EnquirySummary {
   id: string;
+  version?:number;
+  siteId?:string;
   enquiryId: string;
   customerId: string;
   customerName: string;
@@ -84,6 +89,8 @@ export interface EnquirySummary {
 // ─── Request Shapes ─────────────────────────────────────────────
 
 export interface EnquiryFormData {
+  version?:number;
+  siteId?:string;
   customerId?: string;
   customerName: string;
   customerPhone: string;
@@ -91,9 +98,9 @@ export interface EnquiryFormData {
   systemType: SystemType;
   capacityOption: CapacityOption;
   customCapacity?: string;
-  propertyType: PropertyType;
+  propertyType: PropertyType | null;
   installationLocation: string;
-  monthlyElectricityBill?: number;
+  monthlyElectricityBill?: string | number;
   requirements?: string;
   leadSource: LeadSource;
   assignedTo: string;
@@ -104,6 +111,7 @@ export interface EnquiryFormData {
 }
 
 export interface UpdateEnquiryStatusData {
+  version?:number;
   status: EnquiryStatus;
   lostReason?: string;
 }
@@ -134,6 +142,7 @@ export const ENQUIRY_STATUS_LABELS: Record<EnquiryStatus, string> = {
   quotation_sent: 'Quotation Sent',
   won: 'Won',
   lost: 'Lost',
+  disqualified:'Disqualified',
 };
 
 export const ENQUIRY_STATUS_COLOURS: Record<EnquiryStatus, string> = {
@@ -145,6 +154,7 @@ export const ENQUIRY_STATUS_COLOURS: Record<EnquiryStatus, string> = {
   quotation_sent: 'bg-cyan-100 text-cyan-800',
   won: 'bg-green-100 text-green-800',
   lost: 'bg-red-100 text-red-800',
+  disqualified:'bg-slate-100 text-slate-800',
 };
 
 /** Pipeline stages in order */
@@ -153,14 +163,12 @@ export const PIPELINE_STAGES: EnquiryStatus[] = [
   'contacted',
   'qualified',
   'site_survey_pending',
-  'survey_completed',
-  'quotation_sent',
-  'won',
 ];
 
 export const SYSTEM_TYPE_LABELS: Record<SystemType, string> = {
   on_grid: 'On-grid',
   off_grid: 'Off-grid',
+  undecided:'Undecided',
 };
 
 export const CAPACITY_LABELS: Record<CapacityOption, string> = {
@@ -170,18 +178,21 @@ export const CAPACITY_LABELS: Record<CapacityOption, string> = {
   '4kw': '4 kW',
   '5kw': '5 kW',
   custom: 'Custom',
+  unspecified:'Not specified',
 };
 
 export const PRIORITY_LABELS: Record<EnquiryPriority, string> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
+  urgent:'Urgent',
 };
 
 export const PRIORITY_COLOURS: Record<EnquiryPriority, string> = {
   low: 'bg-slate-100 text-slate-600',
   medium: 'bg-amber-100 text-amber-800',
   high: 'bg-red-100 text-red-800',
+  urgent:'bg-red-200 text-red-900',
 };
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {

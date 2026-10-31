@@ -85,7 +85,7 @@ export function EnquiryDetailsPage() {
   const handlePipelineStatusClick = async (newStatus: EnquiryStatus) => {
     if (!id || !enquiry) return;
     try {
-      const updated = await enquiryService.updateStatus(id, { status: newStatus });
+      const updated = await enquiryService.updateStatus(id, { status: newStatus,version:enquiry?.version });
       setEnquiry(updated);
       setSelectedStatus(newStatus);
     } catch (err) {
@@ -98,6 +98,7 @@ export function EnquiryDetailsPage() {
     try {
       setStatusUpdateLoading(true);
       const updated = await enquiryService.updateStatus(id, {
+        version:enquiry?.version,
         status: selectedStatus,
         lostReason: selectedStatus === 'lost' ? lostReason : undefined,
       });
@@ -292,7 +293,7 @@ export function EnquiryDetailsPage() {
 
               <div>
                 <span className="text-xs text-slate-400 block">Property Type</span>
-                <span className="font-medium text-slate-800">{PROPERTY_TYPE_LABELS[enquiry.propertyType]}</span>
+                <span className="font-medium text-slate-800">{(enquiry.propertyType?PROPERTY_TYPE_LABELS[enquiry.propertyType]:'Not recorded')}</span>
               </div>
 
               <div>

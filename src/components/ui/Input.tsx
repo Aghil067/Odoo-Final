@@ -28,6 +28,7 @@ export function Input({ label, error, hint, leftIcon, required, id, className = 
         )}
         <input
           id={inputId}
+        required={required}
           aria-invalid={!!error}
           aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
           className={`

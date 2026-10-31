@@ -2,7 +2,7 @@
  * src/features/crm/components/FollowUpForm.tsx
  * Modal or standalone form to schedule, reschedule, or complete follow-ups.
  */
-import { useState, type FormEvent } from 'react';
+import { useState,useEffect, type FormEvent } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
@@ -11,6 +11,8 @@ import type {
   FollowUpFormData,
   FollowUpType,
 } from '../types/followUp.types';
+import {enquiryService} from '../services/enquiryService';
+import type {EnquirySummary} from '../types/enquiry.types';
 import { FOLLOW_UP_TYPE_LABELS } from '../types/followUp.types';
 
 interface FollowUpFormProps {
@@ -33,13 +35,15 @@ export function FollowUpForm({
   const [formData, setFormData] = useState<FollowUpFormData>({
     customerId,
     enquiryId,
-    assignedTo: 'user-sales-01',
+    assignedTo: '',
     followUpDate: defaultDate ?? new Date().toISOString().split('T')[0],
     followUpTime: '10:00',
     type: 'phone_call',
     notes: '',
   });
 
+  const [leads,setLeads]=useState<EnquirySummary[]>([]);
+  useEffect(()=>{void enquiryService.getByCustomerId(customerId).then(rows=>{setLeads(rows);if(enquiryId){const lead=rows.find(r=>r.id===enquiryId);setFormData(f=>({...f,version:lead?.version}));}});},[customerId,enquiryId]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = (): boolean => {
@@ -60,6 +64,7 @@ export function FollowUpForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <Select label="Customer Lead" required value={formData.enquiryId??''} options={[{value:'',label:'Select a lead'},...leads.map(l=>({value:l.id,label:l.enquiryId}))]} onChange={e=>setFormData({...formData,enquiryId:e.target.value,version:leads.find(l=>l.id===e.target.value)?.version})}/>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Select
           label="Follow-up Type"

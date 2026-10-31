@@ -39,5 +39,5 @@ export async function getPage<T>(url:string,params:Record<string,unknown>={}){co
 export async function postData<T>(url:string,body:unknown){return (await apiClient.post<Envelope<T>>(url,body)).data.data;}
 export async function patchData<T>(url:string,body:unknown){return (await apiClient.patch<Envelope<T>>(url,body)).data.data;}
 export function command(version:number,reason:string,key=crypto.randomUUID()){return {version,reason,idempotencyKey:key};}
-export function unsupported(action:string):never{throw new ApiError(`${action} is unavailable in the current backend workflow. No changes were saved.`,422,'UNSUPPORTED_WORKFLOW');}
+export function unsupported(action:string):never{const message=`${action} is unavailable in the current backend workflow. No changes were saved.`;if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent(API_FAILURE,{detail:message}));throw new ApiError(message,422,'UNSUPPORTED_WORKFLOW');}
 export async function uploadEvidence<T>(url:string,file:File,params:Record<string,string|number>){return (await apiClient.post<Envelope<T>>(url,file,{params,headers:{'Content-Type':file.type},timeout:60000})).data.data;}

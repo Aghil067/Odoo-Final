@@ -23,6 +23,7 @@ export function Select({ label, error, hint, required, options, placeholder, id,
       )}
       <select
         id={inputId}
+        required={required}
         aria-invalid={!!error}
         className={`
           w-full px-3 py-2 text-sm rounded-lg border bg-white text-slate-800

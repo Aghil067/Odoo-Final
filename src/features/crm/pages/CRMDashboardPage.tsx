@@ -176,7 +176,7 @@ export function CRMDashboardPage() {
 
         <Card padding={false} className="p-4 border-l-4 border-l-emerald-500">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-medium">Won / Converted</span>
+            <span className="text-xs font-medium">Accepted Orders</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-slate-800">{isLoading ? '—' : stats.wonEnquiries}</div>

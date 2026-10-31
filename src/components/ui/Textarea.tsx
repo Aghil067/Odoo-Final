@@ -20,6 +20,7 @@ export function Textarea({ label, error, required, id, className = '', ...props 
       )}
       <textarea
         id={inputId}
+        required={required}
         rows={3}
         className={`
           w-full px-3 py-2 text-sm rounded-lg border bg-white text-slate-800
