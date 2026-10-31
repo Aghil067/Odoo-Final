@@ -39,14 +39,14 @@ export const NAV_ITEMS: NavItem[] = [
   {
     id: 'solar_configuration',
     label: 'Solar Configuration',
-    path: '/solar-config',
+    path: '/configurations',
     module: 'solar_configuration',
     iconName: 'Sun',
   },
   {
     id: 'inventory',
     label: 'Inventory',
-    path: '/inventory',
+    path: '/inventory/dashboard',
     module: 'inventory',
     iconName: 'Package',
   },
