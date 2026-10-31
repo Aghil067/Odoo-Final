@@ -32,6 +32,38 @@ import { SurveyDetailsPage } from '../features/surveys/pages/SurveyDetailsPage';
 import { SurveyExecutionPage } from '../features/surveys/pages/SurveyExecutionPage';
 import { SurveyApprovalPage } from '../features/surveys/pages/SurveyApprovalPage';
 
+// Module M03: Solar Configuration Pages
+import { ConfigurationDashboardPage } from '../features/configurations/pages/ConfigurationDashboardPage';
+import { ConfigurationsPage } from '../features/configurations/pages/ConfigurationsPage';
+import { ConfigurationCreatePage } from '../features/configurations/pages/ConfigurationCreatePage';
+import { ConfigurationDetailsPage } from '../features/configurations/pages/ConfigurationDetailsPage';
+import { BOMPreviewPage } from '../features/configurations/pages/BOMPreviewPage';
+import { TemplatesPage } from '../features/configurations/pages/TemplatesPage';
+import { TemplateCreatePage } from '../features/configurations/pages/TemplateCreatePage';
+import { TemplateDetailsPage } from '../features/configurations/pages/TemplateDetailsPage';
+import { ComponentsPage } from '../features/configurations/pages/ComponentsPage';
+
+// Module M04: Inventory & Warehouse Pages
+import { InventoryDashboardPage } from '../features/inventory/pages/InventoryDashboardPage';
+import { ProductsPage } from '../features/inventory/pages/ProductsPage';
+import { ProductCreatePage } from '../features/inventory/pages/ProductCreatePage';
+import { ProductDetailsPage } from '../features/inventory/pages/ProductDetailsPage';
+import { WarehousesPage } from '../features/inventory/pages/WarehousesPage';
+import { StockOverviewPage } from '../features/inventory/pages/StockOverviewPage';
+import { ReceiptsPage } from '../features/inventory/pages/ReceiptsPage';
+import { ReceiptCreatePage } from '../features/inventory/pages/ReceiptCreatePage';
+import { ReceiptDetailsPage } from '../features/inventory/pages/ReceiptDetailsPage';
+import { IssuesPage } from '../features/inventory/pages/IssuesPage';
+import { IssueCreatePage } from '../features/inventory/pages/IssueCreatePage';
+import { IssueDetailsPage } from '../features/inventory/pages/IssueDetailsPage';
+import { TransfersPage } from '../features/inventory/pages/TransfersPage';
+import { TransferCreatePage } from '../features/inventory/pages/TransferCreatePage';
+import { AdjustmentsPage } from '../features/inventory/pages/AdjustmentsPage';
+import { AdjustmentCreatePage } from '../features/inventory/pages/AdjustmentCreatePage';
+import { SerialNumbersPage } from '../features/inventory/pages/SerialNumbersPage';
+import { SerialNumberDetailsPage } from '../features/inventory/pages/SerialNumberDetailsPage';
+import { StockMovementsPage } from '../features/inventory/pages/StockMovementsPage';
+
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
   {
@@ -90,26 +122,48 @@ export const router = createBrowserRouter([
             ],
           },
 
-          // ── Placeholder Modules ──────────────────────────────────
-          // Solar Configuration
+          // ── Module M03: Solar Configuration ──────────────────────
           {
             element: <ProtectedRoute module="solar_configuration" />,
             children: [
-              {
-                path: '/solar-config',
-                element: <PlaceholderPage moduleName="Solar Configuration" moduleKey="solar_configuration" />,
-              },
+              { path: '/solar-config', element: <Navigate to="/configurations" replace /> },
+              { path: '/configurations', element: <ConfigurationDashboardPage /> },
+              { path: '/configurations/dashboard', element: <ConfigurationDashboardPage /> },
+              { path: '/configurations/list', element: <ConfigurationsPage /> },
+              { path: '/configurations/new', element: <ConfigurationCreatePage /> },
+              { path: '/configurations/:id', element: <ConfigurationDetailsPage /> },
+              { path: '/configurations/:id/bom', element: <BOMPreviewPage /> },
+              { path: '/configurations/templates', element: <TemplatesPage /> },
+              { path: '/configurations/templates/new', element: <TemplateCreatePage /> },
+              { path: '/configurations/templates/:id', element: <TemplateDetailsPage /> },
+              { path: '/configurations/components', element: <ComponentsPage /> },
             ],
           },
 
-          // Inventory
+          // ── Module M04: Inventory & Warehouse ─────────────────────
           {
             element: <ProtectedRoute module="inventory" />,
             children: [
-              {
-                path: '/inventory',
-                element: <PlaceholderPage moduleName="Inventory" moduleKey="inventory" />,
-              },
+              { path: '/inventory', element: <Navigate to="/inventory/dashboard" replace /> },
+              { path: '/inventory/dashboard', element: <InventoryDashboardPage /> },
+              { path: '/inventory/products', element: <ProductsPage /> },
+              { path: '/inventory/products/new', element: <ProductCreatePage /> },
+              { path: '/inventory/products/:id', element: <ProductDetailsPage /> },
+              { path: '/inventory/warehouses', element: <WarehousesPage /> },
+              { path: '/inventory/stock', element: <StockOverviewPage /> },
+              { path: '/inventory/receipts', element: <ReceiptsPage /> },
+              { path: '/inventory/receipts/new', element: <ReceiptCreatePage /> },
+              { path: '/inventory/receipts/:id', element: <ReceiptDetailsPage /> },
+              { path: '/inventory/issues', element: <IssuesPage /> },
+              { path: '/inventory/issues/new', element: <IssueCreatePage /> },
+              { path: '/inventory/issues/:id', element: <IssueDetailsPage /> },
+              { path: '/inventory/transfers', element: <TransfersPage /> },
+              { path: '/inventory/transfers/new', element: <TransferCreatePage /> },
+              { path: '/inventory/adjustments', element: <AdjustmentsPage /> },
+              { path: '/inventory/adjustments/new', element: <AdjustmentCreatePage /> },
+              { path: '/inventory/serial-numbers', element: <SerialNumbersPage /> },
+              { path: '/inventory/serial-numbers/:id', element: <SerialNumberDetailsPage /> },
+              { path: '/inventory/movements', element: <StockMovementsPage /> },
             ],
           },
 
