@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import { env } from './config/env.js';
+import {db} from './lib/db.js';
 import { ApiError, errorHandler, requestContext, success } from './lib/http.js';
 import { authRouter, requireTrustedOrigin } from './modules/auth/auth.js';
 import { crmRouter } from './modules/crm/routes.js';
@@ -26,6 +27,7 @@ app.use(rateLimit({ windowMs: 60_000, limit: 200, standardHeaders: 'draft-8', le
   handler: (_req, _res, next) => next(new ApiError(429, 'RATE_LIMITED', 'Too many requests; try again later')),
 }));
 app.get('/api/health', (_req, res) => success(res, { status: 'ok', module: 'M01' }));
+app.get('/api/ready',async(_req,res)=>{try{await db.$queryRaw`SELECT 1`;return success(res,{status:'ready',database:'reachable'});}catch{return res.status(503).json({data:{status:'unavailable',database:'unreachable'}});}});
 app.use(requireTrustedOrigin);
 app.use((req, _res, next) => {
   const surveyUpload = req.method === 'POST' && (/^\/api\/(surveys|installations)\/[a-f0-9-]{36}\/attachments\/?$/i.test(req.path) || /^\/api\/warranties\/(registrations|claims)\/[a-f0-9-]{36}\/evidence\/?$/i.test(req.path) || /^\/api\/service\/tickets\/[a-f0-9-]{36}\/evidence\/?$/i.test(req.path) || /^\/api\/finance\/(quotations|payments|credit-notes|refunds|expenses|service-charges)\/[a-f0-9-]{36}\/evidence\/?$/i.test(req.path));

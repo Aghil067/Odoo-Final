@@ -20,6 +20,7 @@ export function createFinanceRouter(storage:SurveyStorage=new LocalSurveyStorage
  const admin=allowRoles('ADMIN'),finance=allowRoles('ADMIN','FINANCE'),commercial=allowRoles('ADMIN','FINANCE','SALES'),service=allowRoles('ADMIN','FINANCE','SUPPORT');
  const id=(q:Request)=>v.path.parse(q.params).id,child=(q:Request)=>v.path.extend({childId:v.path.shape.id}).parse(q.params),list=(s:Response,result:{data:unknown;pagination:unknown})=>success(s,result.data,200,{pagination:result.pagination});
  const page=v.query.pick({page:true,pageSize:true}),filter=v.query.pick({page:true,pageSize:true,customerId:true,currency:true,q:true}),report=filter.omit({q:true});
+ r.get('/customers',finance,async(q,s)=>list(s,await read.customerDirectory(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
  r.get('/summary',finance,async(q,s)=>success(s,await read.summary(actor(q),report.parse(q.query))));
  r.get('/receivables',finance,async(q,s)=>{const result=await read.receivables(actor(q),report.parse(q.query));return success(s,result.data,200,{pagination:result.pagination,scope:result.scope});});
  r.get('/payments/summary',finance,async(q,s)=>success(s,await read.paymentSummary(actor(q),report.parse(q.query))));
