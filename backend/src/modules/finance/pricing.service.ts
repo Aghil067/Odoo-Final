@@ -1,0 +1,52 @@
+import {z} from 'zod';
+import type {Principal} from '../auth/auth.js';
+import type {Transaction} from '../../lib/db.js';
+import {ApiError} from '../../lib/http.js';
+import {leadScope} from '../crm/access.js';
+import {approvedConfigurationRecord} from '../solar/review.service.js';
+import {admin,post,customer,salesOrFinance,json} from './common.js';
+import {dec,line,totals,sum} from './money.js';
+import * as v from './validation.js';
+import {assertServiceSnapshot} from './source.js';
+export async function source(tx:Transaction,u:Principal,input:Pick<z.infer<typeof v.quote>,'kind'|'configurationId'|'serviceChargeId'>){
+ if(input.kind==='INSTALLATION'){
+  if(!input.configurationId||input.serviceChargeId)throw new ApiError(422,'FINANCE_QUOTE_SOURCE','Installation quotation needs exactly approved configuration');const c=await tx.solarConfiguration.findUniqueOrThrow({where:{id:input.configurationId}});await customer(tx,u,c.customerId);
+  if(u.role==='SALES'&&!await tx.lead.count({where:{AND:[{id:c.leadId},leadScope(u)]}}))throw new ApiError(404,'NOT_FOUND','Authorized commercial lead not found');
+  const h=await approvedConfigurationRecord(tx,c);return {customerId:c.customerId,siteId:c.siteId,leadId:c.leadId,commercialKey:`INSTALLATION:${c.leadId}:${c.siteId}`,configurationId:c.id,configurationApprovedVersion:h.approvedVersion,configurationReviewId:h.reviewId,bomId:h.bom.id,bomVersion:h.bom.version,serviceChargeId:null,requiredBom:h.bom.lines,charge:null,sourceSnapshot:json({configurationId:c.id,approvedVersion:h.approvedVersion,reviewId:h.reviewId,bomId:h.bom.id,bomVersion:h.bom.version,surveyId:h.approvedSurveyId,surveyApprovedVersion:h.approvedSurveyVersion,surveyReviewId:h.surveyReviewId,scope:'TECHNICAL_APPROVAL_NOT_COMMERCIAL_ACCEPTANCE'})};
+ }
+ if(!input.serviceChargeId||input.configurationId)throw new ApiError(422,'FINANCE_QUOTE_SOURCE','Service quotation needs exactly approved service charge');const charge=await tx.financeServiceCharge.findUniqueOrThrow({where:{id:input.serviceChargeId},include:{serviceTicket:{include:{installation:true}}}});await customer(tx,u,charge.customerId);
+ if(charge.status!=='APPROVED'||charge.serviceTicket.status!=='CLOSED')throw new ApiError(409,'FINANCE_SERVICE_SOURCE','Service charges need independently approved request and currently closed M08 work');await assertServiceSnapshot(tx,charge.serviceTicketId,charge.sourceSnapshot);const j=charge.serviceTicket.installation;
+ if(u.role==='SALES'&&!await tx.lead.count({where:{AND:[{id:j.leadId},leadScope(u)]}}))throw new ApiError(404,'NOT_FOUND','Authorized service commercial project not found');
+ return {customerId:charge.customerId,siteId:j.siteId,leadId:j.leadId,commercialKey:`SERVICE:${charge.id}`,configurationId:null,configurationApprovedVersion:null,configurationReviewId:null,bomId:null,bomVersion:null,serviceChargeId:charge.id,requiredBom:[],charge,sourceSnapshot:json(charge.sourceSnapshot)};
+}
+export async function calculate(tx:Transaction,u:Principal,input:z.infer<typeof v.preview>){
+ salesOrFinance(u);const s=await source(tx,u,input),book=await tx.financePriceBook.findUniqueOrThrow({where:{id:input.priceBookId},include:{lines:true}}),now=new Date(),until=new Date(input.validUntil);
+ if(!book.isActive||book.effectiveFrom>now||book.effectiveTo&&book.effectiveTo<=now)throw new ApiError(422,'FINANCE_PRICEBOOK_EFFECTIVE','Select an active effective explicit price book');
+ if(until<=now||until.getTime()-now.getTime()>366*86400000)throw new ApiError(422,'FINANCE_VALIDITY','Quotation validity must be future within366days');
+ if(new Set(input.lines.map(l=>l.priceBookLineId)).size!==input.lines.length)throw new ApiError(422,'FINANCE_DUPLICATE_LINE','Select each price entry once');
+ const taxIds=[...new Set(input.lines.map(l=>l.taxRuleId))],taxes=await tx.financeTaxRule.findMany({where:{id:{in:taxIds}}});let allCosts=true,discountSensitive=false;
+ const lines=input.lines.map((selected,position)=>{
+  const p=book.lines.find(p=>p.id===selected.priceBookLineId),tax=taxes.find(t=>t.id===selected.taxRuleId);if(!p||!tax||!tax.isActive||tax.currency!==book.currency||tax.effectiveFrom>now||tax.effectiveTo&&tax.effectiveTo<=now)throw new ApiError(422,'FINANCE_PRICING_SOURCE','Use selected book entries and active effective same-currency tax rules');
+  if(input.kind==='SERVICE'&&(!s.charge?.allowedKinds.includes(p.kind)||p.kind==='COMPONENT'))throw new ApiError(422,'FINANCE_SERVICE_PARTS_UNSUPPORTED','Only approved nonparts service-fee kinds are billable; pending parts are never consumption');
+  if(input.kind==='INSTALLATION'&&p.kind==='SERVICE_LABOR')throw new ApiError(422,'FINANCE_LINE_KIND','Use installation labor for an installation quotation');
+  if(p.kind==='COMPONENT'){const b=s.requiredBom.find(b=>b.componentId===p.componentId);if(!b||!dec(b.quantity).eq(selected.quantity)||p.unit!==b.unit)throw new ApiError(422,'FINANCE_BOM_QUANTITY','Component selling entries must cover exact approved BOM quantities/units');}
+  const calculated=line(selected.quantity,p.unitPrice.toString(),selected.discount,tax.ratePercent.toString(),tax.inclusive),estimatedCost=p.estimatedUnitCost!==null&&p.costSourceNotes?dec(selected.quantity).times(p.estimatedUnitCost).toDecimalPlaces(2):null;if(estimatedCost===null)allCosts=false;
+  if(calculated.extendedPrice.gt('0')&&calculated.enteredDiscount.div(calculated.extendedPrice).times('100').gt(book.discountApprovalPercent))discountSensitive=true;
+  return {priceBookLineId:p.id,taxRuleId:tax.id,position,kind:p.kind,description:p.description,unit:p.unit,quantity:dec(selected.quantity),unitPrice:p.unitPrice,...calculated,estimatedCost,taxSnapshot:json(tax)};
+ });
+ if(input.kind==='INSTALLATION'&&s.requiredBom.some(b=>!lines.some(l=>book.lines.find(p=>p.id===l.priceBookLineId)?.componentId===b.componentId)))throw new ApiError(422,'FINANCE_BOM_INCOMPLETE','Quote every approved BOM component using explicit selling prices');
+ const componentIds=lines.filter(l=>l.kind==='COMPONENT').map(l=>book.lines.find(p=>p.id===l.priceBookLineId)!.componentId);
+ if(new Set(componentIds).size!==componentIds.length)throw new ApiError(422,'FINANCE_DUPLICATE_COMPONENT','Price each approved BOM component exactly once');
+ const t=totals(lines);if(s.charge&&(book.currency!==s.charge.currency||t.totalAmount.gt(s.charge.proposedAmount)))throw new ApiError(422,'FINANCE_SERVICE_CAP','Service quote must remain within independently approved currency/gross ceiling');
+ const estimatedCost=allCosts?sum(lines.map(l=>l.estimatedCost!)):null,estimatedMargin=estimatedCost===null?null:t.taxableAmount.minus(estimatedCost),sensitivePricing=discountSensitive||t.totalAmount.gt(book.approvalThresholdAmount)||estimatedMargin===null||estimatedMargin.lt('0');
+ const{requiredBom,charge,...identity}=s;return {identity,book,lines,totals:t,estimatedCost,estimatedMargin,sensitivePricing};
+}
+export function publicCalculation(u:Principal,r:Awaited<ReturnType<typeof calculate>>){const safeLines=r.lines.map(l=>{if(u.role!=='SALES')return l;const{estimatedCost:_cost,...safe}=l;return safe;});return {source:r.identity,currency:r.book.currency,priceBookId:r.book.id,lines:safeLines,...r.totals,...(u.role==='SALES'?{}:{estimatedCost:r.estimatedCost,estimatedMargin:r.estimatedMargin}),sensitivePricing:r.sensitivePricing,calculation:'DECIMAL_48_HALF_UP_LINE_2DP_DISCOUNT_BEFORE_TAX'};}
+export function createBook(u:Principal,input:z.infer<typeof v.priceBook>){return post(u,'PRICEBOOK_CREATE',input,async()=>{admin(u);return null;},async tx=>{
+ const previous=await tx.financePriceBook.findFirst({where:{reference:input.reference},orderBy:{revision:'desc'}});if(input.revision!==(previous?.revision??0)+1)throw new ApiError(409,'FINANCE_PRICING_REVISION','Publish the next immutable revision');if(input.effectiveTo&&new Date(input.effectiveTo)<=new Date(input.effectiveFrom))throw new ApiError(422,'FINANCE_PRICING_DATES','Positive effective range required');
+ if(new Set(input.lines.map(l=>l.code)).size!==input.lines.length)throw new ApiError(422,'FINANCE_PRICE_CODES','Unique book line codes required');
+ for(const l of input.lines){if((l.kind==='COMPONENT')!==!!l.componentId)throw new ApiError(422,'FINANCE_COMPONENT_PRICE','Component selling lines reference exactly one M03 component; fees do not');if((l.estimatedUnitCost!==null)!==!!l.costSourceNotes)throw new ApiError(422,'FINANCE_COST_BASIS','Comparable tax-exclusive cost estimate needs explicit source notes');if(l.componentId){const c=await tx.solarComponent.findUniqueOrThrow({where:{id:l.componentId}});if(l.unit!==c.unit)throw new ApiError(422,'FINANCE_SELLING_UNIT','Selling unit must match actual component catalog unit');}}
+ const{idempotencyKey,reason,lines,...fields}=input;return tx.financePriceBook.create({data:{...fields,effectiveFrom:new Date(fields.effectiveFrom),effectiveTo:fields.effectiveTo?new Date(fields.effectiveTo):null,publishedById:u.id,lineCount:lines.length,lines:{create:lines}},include:{lines:true}});
+ });}
+export function createTax(u:Principal,input:z.infer<typeof v.taxRule>){return post(u,'TAX_CREATE',input,async()=>{admin(u);return null;},async tx=>{const previous=await tx.financeTaxRule.findFirst({where:{reference:input.reference},orderBy:{revision:'desc'}});if(input.revision!==(previous?.revision??0)+1)throw new ApiError(409,'FINANCE_TAX_REVISION','Publish next immutable tax revision');if(input.effectiveTo&&new Date(input.effectiveTo)<=new Date(input.effectiveFrom))throw new ApiError(422,'FINANCE_TAX_DATES','Positive effective tax range required');const{idempotencyKey,reason,...fields}=input;return tx.financeTaxRule.create({data:{...fields,effectiveFrom:new Date(fields.effectiveFrom),effectiveTo:fields.effectiveTo?new Date(fields.effectiveTo):null,publishedById:u.id}});});}
+export function deactivate(u:Principal,id:string,kind:'book'|'tax',input:z.infer<typeof v.command>){return post(u,'PRICING_DEACTIVATE',{...input,id,kind},async()=>{admin(u);return null;},async tx=>{const r=kind==='book'?await tx.financePriceBook.findUniqueOrThrow({where:{id}}):await tx.financeTaxRule.findUniqueOrThrow({where:{id}});if(r.version!==input.version||!r.isActive)throw new ApiError(409,'FINANCE_PRICING_VERSION','Refresh current active pricing revision before deactivation');return kind==='book'?tx.financePriceBook.update({where:{id,version:input.version,isActive:true},data:{isActive:false,version:{increment:1}}}):tx.financeTaxRule.update({where:{id,version:input.version,isActive:true},data:{isActive:false,version:{increment:1}}});});}

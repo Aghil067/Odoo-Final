@@ -15,6 +15,8 @@ export function isPublicStoragePath(directory: string): boolean {
 }
 
 const envSchema = z.object({
+  FINANCE_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'finance-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Finance evidence must remain outside repository/public/build'),
+  FINANCE_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
   SERVICE_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'service-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Service evidence must remain outside repository/public/build'),
   SERVICE_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
