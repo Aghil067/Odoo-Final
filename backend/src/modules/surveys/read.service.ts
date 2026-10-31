@@ -1,3 +1,4 @@
+import {availabilityIn} from '../technicians/availability.service.js';
 import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { ApiError, pagination } from '../../lib/http.js';
@@ -69,7 +70,8 @@ export function availability(user: Principal, query: z.infer<typeof v.availabili
     const total = await tx.siteSurvey.count({ where });
     const ongoingVisits = await tx.siteSurvey.count({ where: { assignedToId: query.surveyorId, status: 'IN_PROGRESS' } });
     const data = await tx.siteSurvey.findMany({ where, select: { id: true, reference: true, status: true, scheduledAt: true, scheduledEndAt: true, expectedDurationMinutes: true }, orderBy: [{ scheduledAt: 'asc' }, { id: 'asc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize });
-    return { surveyor, from: query.from, to: query.to, available: total === 0 && ongoingVisits === 0, ongoingVisits,
+    const workforce=query.to.getTime()-query.from.getTime()<=7*86400000?await availabilityIn(tx,query.surveyorId,query.from,query.to,['SURVEY']):null;
+    return { surveyor, from: query.from, to: query.to, available: total === 0 && ongoingVisits === 0 && workforce?.status==='AVAILABLE', workforceStatus:workforce?.status??'NEEDS_REVIEW', ongoingVisits,
       activeWorkload: await tx.siteSurvey.count({ where: { assignedToId: query.surveyorId, status: { in: activeSurveyStatuses } } }),
       appointments: { data, pagination: pagination(query.page, query.pageSize, total) },
     };

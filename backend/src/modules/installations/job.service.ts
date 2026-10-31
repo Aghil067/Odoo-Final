@@ -1,3 +1,4 @@
+import {assertStaffing,installationPurposes} from '../technicians/availability.service.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { ApiError } from '../../lib/http.js';
@@ -14,6 +15,7 @@ export function createJob(user:Principal,input:z.infer<typeof v.create>){return 
  if(handoff.dispatch.lines.some(l=>l.returnedQuantity.gt(0)))throw new ApiError(409,'DISPATCH_RETURNED','A returned dispatch cannot initialize a full installation');
  if(await tx.installationJob.count({where:{leadId:configuration.leadId,siteId:configuration.siteId,status:{not:'CANCELED'}}}))throw new ApiError(409,'PROJECT_ALREADY_INSTALLED','An installation already exists for this lead/site');
  const categories=handoff.approved.bom.lines.map(l=>l.category);validateTestPlan(input.testRequirements,categories);
+ for(const userId of [...input.technicianIds].sort())await assertStaffing(tx,userId,new Date(input.plannedStartAt),new Date(input.plannedEndAt),installationPurposes(categories));
  const row=await tx.installationJob.create({data:{reference:`INS-${randomUUID()}`,name:input.name,customerId:configuration.customerId,siteId:configuration.siteId,leadId:configuration.leadId,configurationId:configuration.id,configurationApprovedVersion:input.configurationApprovedVersion,configurationReviewId:input.configurationReviewId,bomId:input.bomId,bomVersion:input.bomVersion,reservationId:input.reservationId,dispatchId:input.dispatchId,handoffSnapshot:json(handoff),testRequirements:json(input.testRequirements),plannedStartAt:new Date(input.plannedStartAt),plannedEndAt:new Date(input.plannedEndAt),coordinatorId:input.coordinatorId,createdById:user.id,siteReadinessNotes:input.siteReadinessNotes,safetyNotes:input.safetyNotes}});
  await tx.installationAssignment.createMany({data:input.technicianIds.map(userId=>({jobId:row.id,userId}))});
  await tx.installationMilestone.createMany({data:requiredMilestones(categories).map(m=>({...m,jobId:row.id,checks:{approvedDesignFollowed:false,safetyChecked:false,evidenceReviewed:false},evidenceIds:[]}))});
@@ -35,12 +37,14 @@ export function updateJob(user:Principal,id:string,input:z.infer<typeof v.patch>
  if(testRequirements){admin(user);if(row.actualStartAt)throw new ApiError(409,'TEST_PLAN_FROZEN','Test plan is fixed when installation starts');const h=await exactHandoff(tx,row);validateTestPlan(testRequirements,h.approved.bom.lines.map(l=>l.category));}
  if((fields.plannedStartAt||fields.plannedEndAt)&&user.role!=='ADMIN')throw new ApiError(403,'ADMIN_REQUIRED','ADMIN coordinates planning dates');
  if(new Date(fields.plannedEndAt??row.plannedEndAt)<new Date(fields.plannedStartAt??row.plannedStartAt))throw new ApiError(422,'INVALID_DATES','Planned end must not precede start');
+ if(fields.plannedStartAt||fields.plannedEndAt){const handoff=await exactHandoff(tx,row);const assignments=await tx.installationAssignment.findMany({where:{jobId:id},orderBy:{userId:'asc'}});for(const assignment of assignments)await assertStaffing(tx,assignment.userId,new Date(fields.plannedStartAt??row.plannedStartAt),new Date(fields.plannedEndAt??row.plannedEndAt),installationPurposes(handoff.approved.bom.lines.map(l=>l.category)),{excludeJobId:id});}
  return publicJob(await saveJob(tx,user,row,{...fields,...(testRequirements?{testRequirements:json(testRequirements)}:{})},'JOB_UPDATED',reason,{fields:Object.keys(fields),testRequirements:testRequirements??null},true));
 });}
 export function assign(user:Principal,id:string,input:z.infer<typeof v.assign>){return installationAtomic(async tx=>{
  admin(user);const row=await requireJob(tx,user,id,input.version,true);await ownerUser(tx,input.coordinatorId,'ADMIN');for(const userId of input.technicianIds)await ownerUser(tx,userId,'TECHNICIAN');
  const responsible=await tx.installationMilestone.findMany({where:{jobId:id,responsibleUserId:{not:null}}});
  if(responsible.some(m=>m.responsibleUserId!==input.coordinatorId&&!input.technicianIds.includes(m.responsibleUserId!)))throw new ApiError(409,'MILESTONE_ASSIGNEE_IN_USE','Reassign milestone responsibilities before removing that user');
+ const handoff=await exactHandoff(tx,row);for(const userId of [...input.technicianIds].sort())await assertStaffing(tx,userId,row.plannedStartAt,row.plannedEndAt,installationPurposes(handoff.approved.bom.lines.map(l=>l.category)),{excludeJobId:id});
  await tx.installationAssignment.deleteMany({where:{jobId:id}});await tx.installationAssignment.createMany({data:input.technicianIds.map(userId=>({jobId:id,userId}))});
  return publicJob(await saveJob(tx,user,row,{coordinatorId:input.coordinatorId},'ASSIGNED',input.reason,{coordinatorId:input.coordinatorId,technicianIds:input.technicianIds}));
 });}
