@@ -64,6 +64,15 @@ import { SerialNumbersPage } from '../features/inventory/pages/SerialNumbersPage
 import { SerialNumberDetailsPage } from '../features/inventory/pages/SerialNumberDetailsPage';
 import { StockMovementsPage } from '../features/inventory/pages/StockMovementsPage';
 
+// Module M05: Installation Management Pages
+import { InstallationDashboardPage } from '../features/installations/pages/InstallationDashboardPage';
+import { InstallationsPage } from '../features/installations/pages/InstallationsPage';
+import { InstallationCreatePage } from '../features/installations/pages/InstallationCreatePage';
+import { InstallationDetailsPage } from '../features/installations/pages/InstallationDetailsPage';
+import { InstallationSchedulePage } from '../features/installations/pages/InstallationSchedulePage';
+import { InstallationExecutionPage } from '../features/installations/pages/InstallationExecutionPage';
+import { InstallationCompletionPage } from '../features/installations/pages/InstallationCompletionPage';
+
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
   {
@@ -167,14 +176,18 @@ export const router = createBrowserRouter([
             ],
           },
 
-          // Installations
+          // ── Module M05: Installation Management ───────────────────
           {
             element: <ProtectedRoute module="installations" />,
             children: [
-              {
-                path: '/installations',
-                element: <PlaceholderPage moduleName="Installations" moduleKey="installations" />,
-              },
+              { path: '/installations', element: <InstallationsPage /> },
+              { path: '/installations/dashboard', element: <InstallationDashboardPage /> },
+              { path: '/installations/new', element: <InstallationCreatePage /> },
+              { path: '/installations/schedule', element: <InstallationSchedulePage /> },
+              { path: '/installations/:id', element: <InstallationDetailsPage /> },
+              { path: '/installations/:id/edit', element: <InstallationCreatePage /> },
+              { path: '/installations/:id/execution', element: <InstallationExecutionPage /> },
+              { path: '/installations/:id/completion', element: <InstallationCompletionPage /> },
             ],
           },
 
