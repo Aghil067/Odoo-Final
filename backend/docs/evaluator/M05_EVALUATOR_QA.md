@@ -1,0 +1,42 @@
+# M05 evaluator questions and answers
+
+1. **What does M05 own?** Installation execution, site receipt/readiness, milestones, installed equipment trace, issues, private evidence, internal testing and independent commissioning completion.
+2. **What does M04 still own?** Warehouse quantities, reservations, dispatch/return movements and inventory serial lifecycle. M05 references these records and does not fabricate stock movements.
+3. **Was M04 merged before branching?** Yes. PR #4 merged at 2a6a441; M05 branches from origin/main and documents that dependency. It does not carry an unmerged M04 diff against main.
+4. **How is project identity determined?** From the actual approved configuration/BOM and the same posted dispatch/reservation. Posted customer/site strings do not create new identity masters.
+5. **Does dispatch prove site delivery?** No. It proves warehouse release. M05 requires a separately observed, actor-attributed, dated and evidenced site receipt.
+6. **What prevents starting with missing equipment?** Full usable quantity/serial receipt, readiness/safety checks, current upstream eligibility and resolution of blocking/high/critical issues are checked before start/resume.
+7. **Can a partial site receipt be recorded?** Yes, cumulatively before start or while held, including zeros/damage. Execution waits for full usable verification; receipt history remains immutable.
+8. **What happens to damage/missing observations?** HIGH blocking issues are opened. Later receipt verification does not silently close them; authorized resolution/evidence is required.
+9. **Are received and damaged quantities combined?** No. receivedQuantity is usable verified equipment; damagedQuantity is separate. Their sum cannot exceed dispatched minus returned.
+10. **How are simultaneous edits handled?** Serializable transactions and conditional job-version updates allow one current change; conflicting requests roll back and receive409. Clients refresh rather than overwrite.
+11. **Why separate executionRevision from version?** Public version protects every command; executionRevision invalidates earlier tests after work/readiness/equipment/issue changes. Evidence uploads or assignment edits alone do not fabricate a new physical test state.
+12. **Are retries idempotency-key commands?** No. Creation has unique dispatch/reservation/project claims; subsequent commands require expected versions. After uncertain results, inspect job/history before retrying.
+13. **Which milestones apply?** Ten defined types; battery required only with batteries, mounting required with mounting materials, core safety/electrical/inspection milestones required. Optional N/A requires ADMIN rationale.
+14. **Can a required milestone be waived?** No. Required flags derive from the approved BOM and cannot be lowered by client input.
+15. **Can anyone complete a milestone?** Only ADMIN or a technician explicitly assigned to that job may edit it. Completion also needs responsibility, checks, evidence, notes, active execution and no blockers.
+16. **How is installed quantity limited?** It is cumulative, positive/nondecreasing and no greater than verified usable receipt. Full work completion reconciles every original BOM/dispatch quantity.
+17. **How are serials traced?** Equipment links the original dispatch line; normalized serial claims link actual immutable M04 serial IDs. Original receipt identity, site verification, installation actor/time/location and commissioning snapshot remain linked.
+18. **Can a serial be installed twice?** No. Each serialUnitId has one global installation claim for all time in this version. It cannot be reassigned through arbitrary job edits.
+19. **Can equipment be substituted?** No substitution/removal workflow is implemented. The original dispatch/component/serial identity is immutable; inventory evidence cannot be invented to bypass it.
+20. **Can installed equipment be returned through M04?** M05 adds protective guards that reject dispatch returns/serial state changes which orphan installed records. A future explicitly approved corrective-removal workflow is necessary.
+21. **How do issues block work?** Any open blocking issue or HIGH/CRITICAL issue blocks readiness/execution/completion/commissioning gates. Issue status never auto-closes because job status changed.
+22. **Who resolves critical issues?** ADMIN, with resolution and evidence. The independent commissioning reviewer must remain uninvolved in the job's nonreview changes, including resolution.
+23. **How are tests chosen?** ADMIN supplies all nine type definitions with actual design/manufacturer basis and measurement/unit requirements before start. Core checks cannot be disabled; irrelevant battery testing is not forced.
+24. **Does the backend invent safe electrical thresholds?** No. It records actual observations/measurements and tester-attested PASS/FAIL/NEEDS_REVIEW against the stored requirements basis. There is no universal threshold or certification claim.
+25. **How is not-applicable testing represented?** Only optional tests, by ADMIN, with rationale, null measurement/unit and NEEDS_REVIEW rather than fabricated PASS.
+26. **Can old passing tests approve changed work?** No. Only latest per-type tests from the current executionRevision count. Explicit or review-required rework invalidates older tests.
+27. **What does commissioning require?** Current upstream eligibility, full site receipt/readiness, all required milestones, full equipment reconciliation, current required PASS tests, no blockers, completion notes/work dates and completion evidence.
+28. **Can the creator approve commissioning?** No. An active independent ADMIN with no nonreview contribution must review the exact submitted version. Snapshots/checklist/decision are immutable.
+29. **Does internal commissioning permit grid energization?** No. ExternalGridAuthorization is NOT_RECORDED. Utility permission and regulatory/electrical certification are separate responsibilities.
+30. **Can commissioned jobs be reopened?** No. They and their children freeze. Postcommission corrections/superseding/removal workflows are deliberately unsupported rather than silently reopening history.
+31. **How is rework handled before commissioning?** Explicit request-rework or independent REWORK_REQUIRED review returns execution to a controlled rework state, clears work-end when appropriate and invalidates tests. Work must be completed/tested/submitted again.
+32. **How are private attachments protected?** Existing secure local storage pattern, safe opaque keys, allowed MIME/name/signature/size checks, scoped downloads, digest integrity, cookie/Origin/CSRF, upload limits and no public filesystem path exposure.
+33. **Do signatures scan for malware?** No. Production needs separate scanning, secure private-volume ACLs, reconciliation/retention/backups. Static verification creates no evidence object.
+34. **What permissions do technicians have?** Only jobs explicitly assigned through InstallationAssignment, not every job or a global frontend role label. This is authorization assignment, not M06 workforce scheduling.
+35. **What can WAREHOUSE/FINANCE/SUPPORT read?** WAREHOUSE sees limited dispatch/equipment references; FINANCE sees commissioned summaries/handoff only without private downloads; SUPPORT has no broad M05 access in this version.
+36. **How does M05 support M07/M08?** A guarded commissioned handoff supplies project/design/BOM/dispatch/review identities, installed serials, test summary, notes/evidence and separate delivery/commissioning dates. It creates no warranty or service ticket.
+37. **When does warranty start?** M05 deliberately does not decide. Delivery and commissioning timestamps stay distinct; warrantyStartDate is NOT_DETERMINED_BY_M05 for future business rules.
+38. **What was verified?** Prisma generation/schema validation, strict TypeScript, production backend build and source/SQL/Git review. No migrations, server, runtime/E2E tests or sample records were executed.
+39. **What remains unverified?** Actual PostgreSQL guards, races/rollback/timeouts, private file operations, authentication/CSRF/API integration and end-to-end electrical/commissioning workflow.
+40. **What are the principal limits?** One job per dispatch/reservation and one active project, full-BOM installation, no spares/partial commissioning/replacements/substitutions/removal/postcommission amendment, existing timeout/bounded requests and frontend mocks awaiting deliberate integration.

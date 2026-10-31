@@ -8,6 +8,7 @@ import { ApiError, errorHandler, requestContext, success } from './lib/http.js';
 import { authRouter, requireTrustedOrigin } from './modules/auth/auth.js';
 import { crmRouter } from './modules/crm/routes.js';
 import { createSurveyRouter } from './modules/surveys/routes.js';
+import { createInstallationRouter } from './modules/installations/routes.js';
 import { inventoryRouter } from './modules/inventory/routes.js';
 import { solarRouter } from './modules/solar/routes.js';
 
@@ -22,7 +23,7 @@ app.use(rateLimit({ windowMs: 60_000, limit: 200, standardHeaders: 'draft-8', le
 app.get('/api/health', (_req, res) => success(res, { status: 'ok', module: 'M01' }));
 app.use(requireTrustedOrigin);
 app.use((req, _res, next) => {
-  const surveyUpload = req.method === 'POST' && /^\/api\/surveys\/[a-f0-9-]{36}\/attachments\/?$/i.test(req.path);
+  const surveyUpload = req.method === 'POST' && /^\/api\/(surveys|installations)\/[a-f0-9-]{36}\/attachments\/?$/i.test(req.path);
   if (['POST', 'PATCH', 'PUT'].includes(req.method) && !surveyUpload && !req.is('application/json')) throw new ApiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be application/json');
   next();
 });
@@ -31,6 +32,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/surveys', createSurveyRouter());
 app.use('/api/solar', solarRouter);
 app.use('/api/inventory', inventoryRouter);
+app.use('/api/installations', createInstallationRouter());
 app.use('/api', crmRouter);
 app.use((_req, _res, next) => next(new ApiError(404, 'NOT_FOUND', 'Endpoint not found')));
 app.use(errorHandler);

@@ -26,6 +26,8 @@ const envSchema = z.object({
   SESSION_HOURS: z.coerce.number().int().min(1).max(24).default(8),
   DEFAULT_PHONE_COUNTRY: z.string().default('IN').refine(isSupportedCountry, 'Unsupported phone country'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(3).default(0),
+  INSTALLATION_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'installation-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Installation storage must be outside repository/public/build paths'),
+  INSTALLATION_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
   SURVEY_STORAGE_ADAPTER: z.literal('local').default('local'),
   SURVEY_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'survey-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Survey storage must be outside the frontend repository and public/build directories'),
   SURVEY_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),

@@ -60,6 +60,20 @@ enum ActivityType {
 }
 
 model User {
+  createdInstallationJobs InstallationJob[] @relation("InstallationCreator")
+  coordinatedInstallationJobs InstallationJob[] @relation("InstallationCoordinator")
+  installationAssignments InstallationAssignment[]
+  installationMilestones InstallationMilestone[] @relation("MilestoneResponsible")
+  installedEquipment InstallationEquipment[] @relation("EquipmentInstaller")
+  installedSerials InstallationEquipmentSerial[] @relation("SerialInstaller")
+  reportedInstallationIssues InstallationIssue[] @relation("IssueReporter")
+  resolvedInstallationIssues InstallationIssue[] @relation("IssueResolver")
+  installationAttachments InstallationAttachment[]
+  installationTests InstallationTest[]
+  installationReviews InstallationCommissioningReview[]
+  installationEvents InstallationStatusHistory[]
+  installationReceipts InstallationReceipt[]
+  installationReadiness InstallationReadiness[]
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique @db.VarChar(254)
   name         String   @db.VarChar(120)
@@ -101,6 +115,7 @@ model Session {
 }
 
 model Customer {
+  installationJobs InstallationJob[]
   id              String       @id @default(uuid()) @db.Uuid
   reference       String       @unique @db.VarChar(40)
   type            CustomerType @default(INDIVIDUAL)
@@ -132,6 +147,7 @@ model Customer {
 }
 
 model Site {
+  installationJobs InstallationJob[]
   id            String   @id @default(uuid()) @db.Uuid
   customerId    String   @db.Uuid
   customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -158,6 +174,7 @@ model Site {
 }
 
 model Lead {
+  installationJobs InstallationJob[]
   id                     String       @id @default(uuid()) @db.Uuid
   reference              String       @unique @db.VarChar(40)
   customerId             String       @db.Uuid
@@ -515,6 +532,7 @@ enum SolarReviewDecision {
 }
 
 model SolarComponent {
+  installationEquipment InstallationEquipment[]
   inventoryBalances InventoryBalance[]
   inventorySerials InventorySerialUnit[]
   stockReservationLines StockReservationLine[]
@@ -602,6 +620,7 @@ model SolarTemplateRevision {
 }
 
 model SolarConfiguration {
+  installationJobs InstallationJob[]
   stockReservations StockReservation[]
   id             String @id @default(uuid()) @db.Uuid
   reference      String @unique @db.VarChar(40)
@@ -663,6 +682,7 @@ model SolarConfiguration {
 }
 
 model BillOfMaterials {
+  installationJobs InstallationJob[]
   stockReservations StockReservation[]
   id             String @id @default(uuid()) @db.Uuid
   reference      String @unique @db.VarChar(40)
@@ -846,6 +866,8 @@ model StockMovement {
   @@index([operationId])
 }
 model InventorySerialUnit {
+  installationSerial InstallationEquipmentSerial?
+  installationIssues InstallationIssue[]
   id String @id @default(uuid()) @db.Uuid
   serialNumber String @unique @db.VarChar(160)
   componentId String @db.Uuid
@@ -887,6 +909,7 @@ model InventorySerialEvent {
   @@index([operationId])
 }
 model StockReservation {
+  installationJob InstallationJob?
   id String @id @default(uuid()) @db.Uuid
   reference String @unique @db.VarChar(100)
   configurationId String @db.Uuid
@@ -927,6 +950,7 @@ model StockReservationLine {
   @@unique([reservationId,bomLineId])
 }
 model StockDispatch {
+  installationJob InstallationJob?
   id String @id @default(uuid()) @db.Uuid
   reference String @unique @db.VarChar(100)
   reservationId String @unique @db.Uuid
@@ -942,6 +966,7 @@ model StockDispatch {
   lines StockDispatchLine[]
 }
 model StockDispatchLine {
+  installationEquipment InstallationEquipment?
   serialUnitIds String[] @db.Uuid
   id String @id @default(uuid()) @db.Uuid
   dispatchId String @db.Uuid
@@ -966,4 +991,323 @@ model StockTransfer {
   component SolarComponent @relation(fields:[componentId],references:[id],onDelete:Restrict)
   quantity Decimal @db.Decimal(18,3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+enum InstallationStatus {
+  PLANNED
+  SITE_READY
+  IN_PROGRESS
+  ON_HOLD
+  WORK_COMPLETED
+  TESTING
+  COMMISSIONING_REVIEW
+  COMMISSIONED
+  REWORK_REQUIRED
+  CANCELED
+}
+enum InstallationMilestoneType {
+  SITE_PREPARATION
+  MOUNTING_STRUCTURE
+  SOLAR_PANELS
+  INVERTER
+  BATTERY
+  DC_WIRING
+  AC_WIRING
+  EARTHING_PROTECTION
+  SYSTEM_CONFIGURATION
+  FINAL_INSPECTION
+}
+enum InstallationMilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  NOT_APPLICABLE
+}
+enum InstallationIssueType {
+  EQUIPMENT_MISSING
+  EQUIPMENT_DAMAGED
+  SITE_ACCESS
+  ROOF_MOUNTING
+  ELECTRICAL_SAFETY
+  DESIGN_MISMATCH
+  WEATHER_DELAY
+  OTHER
+}
+enum InstallationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum InstallationTestType {
+  VISUAL_INSPECTION
+  MOUNTING_VERIFICATION
+  POLARITY
+  EARTHING
+  INSULATION
+  INVERTER_STARTUP
+  PROTECTION_DEVICES
+  BATTERY
+  FUNCTIONAL_SYSTEM
+}
+enum InstallationTestResult {
+  PASS
+  FAIL
+  NEEDS_REVIEW
+}
+enum InstallationReviewDecision {
+  APPROVED
+  REWORK_REQUIRED
+}
+model InstallationJob {
+  id String @id @default(uuid()) @db.Uuid
+  reference String @unique @db.VarChar(60)
+  name String @db.VarChar(160)
+  customerId String @db.Uuid
+  customer Customer @relation(fields:[customerId],references:[id],onDelete:Restrict)
+  siteId String @db.Uuid
+  site Site @relation(fields:[siteId,customerId],references:[id,customerId],onDelete:Restrict)
+  leadId String @db.Uuid
+  lead Lead @relation(fields:[leadId],references:[id],onDelete:Restrict)
+  configurationId String @db.Uuid
+  configuration SolarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Restrict)
+  configurationApprovedVersion Int
+  configurationReviewId String @db.Uuid
+  bomId String @db.Uuid
+  bom BillOfMaterials @relation(fields:[bomId],references:[id],onDelete:Restrict)
+  bomVersion Int
+  reservationId String @unique @db.Uuid
+  reservation StockReservation @relation(fields:[reservationId],references:[id],onDelete:Restrict)
+  dispatchId String @unique @db.Uuid
+  dispatch StockDispatch @relation(fields:[dispatchId],references:[id],onDelete:Restrict)
+  handoffSnapshot Json
+  testRequirements Json
+  status InstallationStatus @default(PLANNED)
+  resumeStatus InstallationStatus?
+  plannedStartAt DateTime @db.Timestamptz(3)
+  plannedEndAt DateTime @db.Timestamptz(3)
+  actualStartAt DateTime? @db.Timestamptz(3)
+  actualEndAt DateTime? @db.Timestamptz(3)
+  deliveryConfirmedAt DateTime? @db.Timestamptz(3)
+  commissionedAt DateTime? @db.Timestamptz(3)
+  coordinatorId String @db.Uuid
+  coordinator User @relation("InstallationCoordinator",fields:[coordinatorId],references:[id],onDelete:Restrict)
+  createdById String @db.Uuid
+  createdBy User @relation("InstallationCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  siteReadinessNotes String? @db.VarChar(5000)
+  safetyNotes String? @db.VarChar(5000)
+  completionNotes String? @db.VarChar(5000)
+  version Int @default(1)
+  executionRevision Int @default(1)
+  approvedVersion Int?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  assignments InstallationAssignment[]
+  milestones InstallationMilestone[]
+  equipment InstallationEquipment[]
+  issues InstallationIssue[]
+  attachments InstallationAttachment[]
+  tests InstallationTest[]
+  reviews InstallationCommissioningReview[]
+  history InstallationStatusHistory[]
+  receipts InstallationReceipt[]
+  readiness InstallationReadiness[]
+  @@index([status,plannedStartAt])
+  @@index([leadId,siteId])
+  @@index([coordinatorId,status])
+}
+model InstallationAssignment {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  userId String @db.Uuid
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+  @@unique([jobId,userId])
+  @@index([userId,jobId])
+}
+model InstallationMilestone {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  type InstallationMilestoneType
+  required Boolean
+  status InstallationMilestoneStatus @default(PENDING)
+  responsibleUserId String? @db.Uuid
+  responsibleUser User? @relation("MilestoneResponsible",fields:[responsibleUserId],references:[id],onDelete:Restrict)
+  plannedStartAt DateTime? @db.Timestamptz(3)
+  plannedEndAt DateTime? @db.Timestamptz(3)
+  actualStartAt DateTime? @db.Timestamptz(3)
+  actualEndAt DateTime? @db.Timestamptz(3)
+  checks Json
+  completionNotes String? @db.VarChar(5000)
+  evidenceIds String[] @db.Uuid
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  issues InstallationIssue[]
+  attachments InstallationAttachment[]
+  @@unique([jobId,type])
+  @@unique([id,jobId])
+}
+model InstallationEquipment {
+  issues InstallationIssue[]
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  dispatchLineId String @unique @db.Uuid
+  dispatchLine StockDispatchLine @relation(fields:[dispatchLineId],references:[id],onDelete:Restrict)
+  componentId String @db.Uuid
+  component SolarComponent @relation(fields:[componentId],references:[id],onDelete:Restrict)
+  unit SolarUnit
+  serializationRequired Boolean
+  dispatchedQuantity Decimal @db.Decimal(18,3)
+  receivedQuantity Decimal @default(0) @db.Decimal(18,3)
+  damagedQuantity Decimal @default(0) @db.Decimal(18,3)
+  installedQuantity Decimal @default(0) @db.Decimal(18,3)
+  installedLocation String? @db.VarChar(1000)
+  installedAt DateTime? @db.Timestamptz(3)
+  installerId String? @db.Uuid
+  installer User? @relation("EquipmentInstaller",fields:[installerId],references:[id],onDelete:Restrict)
+  notes String? @db.VarChar(5000)
+  serials InstallationEquipmentSerial[]
+  @@unique([jobId,componentId])
+  @@unique([id,jobId])
+}
+model InstallationEquipmentSerial {
+  id String @id @default(uuid()) @db.Uuid
+  equipmentId String @db.Uuid
+  equipment InstallationEquipment @relation(fields:[equipmentId],references:[id],onDelete:Restrict)
+  serialUnitId String @unique @db.Uuid
+  serialUnit InventorySerialUnit @relation(fields:[serialUnitId],references:[id],onDelete:Restrict)
+  received Boolean @default(false)
+  damaged Boolean @default(false)
+  installedAt DateTime? @db.Timestamptz(3)
+  installedLocation String? @db.VarChar(1000)
+  installerId String? @db.Uuid
+  installer User? @relation("SerialInstaller",fields:[installerId],references:[id],onDelete:Restrict)
+  @@index([equipmentId])
+}
+model InstallationIssue {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  type InstallationIssueType
+  severity InstallationSeverity
+  blocking Boolean @default(true)
+  description String @db.VarChar(5000)
+  milestoneId String? @db.Uuid
+  milestone InstallationMilestone? @relation(fields:[milestoneId,jobId],references:[id,jobId],onDelete:Restrict)
+  equipmentId String? @db.Uuid
+  equipment InstallationEquipment? @relation(fields:[equipmentId,jobId],references:[id,jobId],onDelete:Restrict)
+  serialUnitId String? @db.Uuid
+  serialUnit InventorySerialUnit? @relation(fields:[serialUnitId],references:[id],onDelete:Restrict)
+  reportedById String @db.Uuid
+  reportedBy User @relation("IssueReporter",fields:[reportedById],references:[id],onDelete:Restrict)
+  reportedAt DateTime @default(now()) @db.Timestamptz(3)
+  status String @default("OPEN") @db.VarChar(20)
+  resolution String? @db.VarChar(5000)
+  resolvedById String? @db.Uuid
+  resolvedBy User? @relation("IssueResolver",fields:[resolvedById],references:[id],onDelete:Restrict)
+  resolvedAt DateTime? @db.Timestamptz(3)
+  evidenceIds String[] @db.Uuid
+  attachments InstallationAttachment[]
+  @@unique([id,jobId])
+  @@index([jobId,status,severity])
+}
+model InstallationAttachment {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  milestoneId String? @db.Uuid
+  milestone InstallationMilestone? @relation(fields:[milestoneId,jobId],references:[id,jobId],onDelete:Restrict)
+  issueId String? @db.Uuid
+  issue InstallationIssue? @relation(fields:[issueId,jobId],references:[id,jobId],onDelete:Restrict)
+  category String @db.VarChar(40)
+  fileName String @db.VarChar(160)
+  mimeType String @db.VarChar(100)
+  sizeBytes Int
+  sha256 String @db.Char(64)
+  storageKey String @unique @db.VarChar(100)
+  uploaderId String @db.Uuid
+  uploader User @relation(fields:[uploaderId],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([jobId,createdAt])
+}
+model InstallationTest {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  type InstallationTestType
+  applicable Boolean
+  result InstallationTestResult
+  observations String @db.VarChar(5000)
+  measurement Decimal? @db.Decimal(24,6)
+  unit String? @db.VarChar(40)
+  requirementsBasis String @db.VarChar(2000)
+  notApplicableReason String? @db.VarChar(2000)
+  notes String? @db.VarChar(5000)
+  testerId String @db.Uuid
+  tester User @relation(fields:[testerId],references:[id],onDelete:Restrict)
+  testedAt DateTime @default(now()) @db.Timestamptz(3)
+  executionRevision Int
+  jobVersion Int
+  evidenceIds String[] @db.Uuid
+  @@unique([jobId,jobVersion])
+  @@index([jobId,type,executionRevision,jobVersion])
+}
+model InstallationCommissioningReview {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  jobVersion Int
+  reviewerId String @db.Uuid
+  reviewer User @relation(fields:[reviewerId],references:[id],onDelete:Restrict)
+  decision InstallationReviewDecision
+  checklist Json
+  notes String @db.VarChar(5000)
+  snapshot Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([jobId,jobVersion])
+}
+model InstallationStatusHistory {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  actorId String @db.Uuid
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+  event String @db.VarChar(60)
+  fromStatus InstallationStatus?
+  toStatus InstallationStatus
+  jobVersion Int
+  reason String @db.VarChar(2000)
+  details Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([jobId,jobVersion])
+}
+model InstallationReceipt {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  actorId String @db.Uuid
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+  receivedAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  jobVersion Int
+  notes String @db.VarChar(5000)
+  snapshot Json
+  evidenceIds String[] @db.Uuid
+  @@unique([jobId,jobVersion])
+}
+model InstallationReadiness {
+  id String @id @default(uuid()) @db.Uuid
+  jobId String @db.Uuid
+  job InstallationJob @relation(fields:[jobId],references:[id],onDelete:Restrict)
+  actorId String @db.Uuid
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+  checklist Json
+  notes String @db.VarChar(5000)
+  conditionalWorkResolution String @db.VarChar(5000)
+  outstandingIssues String? @db.VarChar(5000)
+  evidenceIds String[] @db.Uuid
+  jobVersion Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([jobId,jobVersion])
 }
