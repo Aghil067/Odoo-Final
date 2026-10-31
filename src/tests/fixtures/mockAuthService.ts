@@ -18,14 +18,14 @@
  * Nothing else needs to change – both services implement IAuthService.
  */
 
-import type { IAuthService } from './authService';
+import type { IAuthService } from '../../features/auth/services/authService';
 import type {
   AuthenticatedUser,
   LoginRequest,
   LoginResponse,
   MeResponse,
   UserRole,
-} from '../types/auth.types';
+} from '../../features/auth/types/auth.types';
 
 // ─── Development-only password ─────────────────────────────────
 /** Single password shared by all mock accounts. Development only. */

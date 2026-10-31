@@ -25,7 +25,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { AuthProvider } from '../features/auth/context/AuthContext';
 import { useAuth } from '../features/auth/hooks/useAuth';
-import { mockAuthService, MOCK_ACCOUNT_LIST } from '../features/auth/services/mockAuthService';
+import { mockAuthService, MOCK_ACCOUNT_LIST } from './fixtures/mockAuthService';
 import { ProtectedRoute } from '../components/common/ProtectedRoute';
 import { PermissionGuard } from '../components/common/PermissionGuard';
 import { canAccess, getPermission } from '../config/permissions';

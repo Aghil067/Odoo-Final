@@ -13,6 +13,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   test: {
+    include:['src/tests/**/*.{test,spec}.{ts,tsx}'],
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/tests/setup.ts',

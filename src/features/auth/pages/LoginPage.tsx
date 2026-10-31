@@ -22,16 +22,12 @@
 import { Eye, EyeOff, Loader2, Sun, Zap } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { MOCK_ACCOUNT_LIST } from '../services/mockAuthService';
 import { useAuth } from '../hooks/useAuth';
-import type { UserRole } from '../types/auth.types';
-import { ROLE_META } from '../../../config/roles';
 
 // ─── Form state type ────────────────────────────────────────────
 interface FormValues {
   email: string;
   password: string;
-  rememberMe: boolean;
 }
 
 interface FormErrors {
@@ -56,9 +52,7 @@ function validate(values: FormValues): FormErrors {
 }
 
 // ─── Role colour helper ─────────────────────────────────────────
-function getRoleColour(role: UserRole): string {
-  return ROLE_META[role]?.badgeColour ?? 'bg-slate-100 text-slate-800';
-}
+
 
 // ─── Component ──────────────────────────────────────────────────
 export function LoginPage() {
@@ -72,7 +66,6 @@ export function LoginPage() {
   const [values, setValues] = useState<FormValues>({
     email: '',
     password: '',
-    rememberMe: false,
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -101,7 +94,7 @@ export function LoginPage() {
     if (Object.keys(validationErrors).length > 0) return;
 
     try {
-      await login({ email: values.email, password: values.password, rememberMe: values.rememberMe });
+      await login({ email: values.email, password: values.password });
       navigate(from, { replace: true });
     } catch {
       // Error is already captured in AuthContext and displayed below
@@ -109,11 +102,7 @@ export function LoginPage() {
   }
 
   // Dev panel: fill in credentials for a mock account
-  function selectMockAccount(email: string, password: string) {
-    setValues((prev) => ({ ...prev, email, password }));
-    setErrors({});
-    setTouched({});
-  }
+
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -261,22 +250,6 @@ export function LoginPage() {
                 )}
               </div>
 
-              {/* Remember me */}
-              <div className="flex items-center gap-2">
-                <input
-                  id="rememberMe"
-                  type="checkbox"
-                  checked={values.rememberMe}
-                  onChange={(e) => handleChange('rememberMe', e.target.checked)}
-                  disabled={isLoading}
-                  className="w-4 h-4 rounded border-slate-300 text-green-600
-                             focus:ring-green-500 focus:ring-offset-0 cursor-pointer"
-                />
-                <label htmlFor="rememberMe" className="text-sm text-slate-600 cursor-pointer">
-                  Remember me
-                </label>
-              </div>
-
               {/* Submit */}
               <button
                 type="submit"
@@ -302,39 +275,7 @@ export function LoginPage() {
             </form>
           </div>
 
-          {/* ─── DEV-ONLY: Quick credential selector ─────────────────
-               Rendered only in development builds.
-               import.meta.env.PROD is true in `npm run build` → hidden. */}
-          {!import.meta.env.PROD && (
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs font-bold text-amber-800 uppercase tracking-wide">
-                  🛠 Dev Mode — Test Accounts
-                </span>
-              </div>
-              <p className="text-xs text-amber-700 mb-3">
-                Password for all accounts:{' '}
-                <code className="font-mono bg-amber-100 px-1 rounded">{MOCK_ACCOUNT_LIST[0]?.password}</code>
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {MOCK_ACCOUNT_LIST.map((account) => (
-                  <button
-                    key={account.email}
-                    type="button"
-                    onClick={() => selectMockAccount(account.email, account.password)}
-                    className="flex flex-col items-start p-2 rounded-lg bg-white border border-amber-200
-                               hover:border-amber-400 hover:bg-amber-50 transition-colors text-left
-                               focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  >
-                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full mb-1 ${getRoleColour(account.role as UserRole)}`}>
-                      {ROLE_META[account.role as UserRole]?.label}
-                    </span>
-                    <span className="text-xs text-slate-600 truncate w-full">{account.email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
     </div>
