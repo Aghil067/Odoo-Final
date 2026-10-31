@@ -83,7 +83,7 @@ export function operations(user:Principal,q:Query) { reader(user);return invento
  const where:Prisma.InventoryOperationWhereInput={kind:q.kind,...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
  return {data:await tx.inventoryOperation.findMany({where,...paging(q),select:{id:true,kind:true,reference:true,actorId:true,reason:true,createdAt:true},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.inventoryOperation.count({where}))};
 });}
-export function operationDetail(user:Principal,id:string) {reader(user);return inventoryAtomic(tx=>tx.inventoryOperation.findUniqueOrThrow({where:{id},select:{id:true,kind:true,reference:true,actorId:true,reason:true,payload:true,result:true,createdAt:true}}));}
+export function operationDetail(user:Principal,id:string) {reader(user);return inventoryAtomic(tx=>tx.inventoryOperation.findUniqueOrThrow({where:{id},select:{id:true,kind:true,reference:true,actorId:true,actor:{select:{id:true,name:true}},reason:true,payload:true,result:true,createdAt:true,serialEvents:{select:{id:true,fromState:true,toState:true,version:true,serialUnit:{select:{id:true,serialNumber:true,componentId:true}}},orderBy:{version:'asc'}}}}));}
 
 const componentLookupSelect={id:true,sku:true,name:true,category:true,unit:true,serializationRequired:true,isActive:true,version:true,manufacturer:true,modelNumber:true} as const;
 export function components(user:Principal,q:Query){reader(user);return inventoryAtomic(async tx=>{

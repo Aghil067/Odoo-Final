@@ -63,6 +63,7 @@ import { AdjustmentCreatePage } from '../features/inventory/pages/AdjustmentCrea
 import { SerialNumbersPage } from '../features/inventory/pages/SerialNumbersPage';
 import { SerialNumberDetailsPage } from '../features/inventory/pages/SerialNumberDetailsPage';
 import { StockMovementsPage } from '../features/inventory/pages/StockMovementsPage';
+import { StockOperationDetailsPage } from '../features/inventory/pages/StockOperationDetailsPage';
 
 // Module M05: Installation Management Pages
 import { InstallationDashboardPage } from '../features/installations/pages/InstallationDashboardPage';
@@ -219,6 +220,7 @@ export const router = createBrowserRouter([
               { path: '/inventory/serial-numbers', element: <SerialNumbersPage /> },
               { path: '/inventory/serial-numbers/:id', element: <SerialNumberDetailsPage /> },
               { path: '/inventory/movements', element: <StockMovementsPage /> },
+              { path: '/inventory/operations/:id', element: <StockOperationDetailsPage /> },
             ],
           },
 
