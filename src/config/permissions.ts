@@ -132,13 +132,13 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
 
   finance: {
     admin:                'full',
-    sales_executive:      'none',
+    sales_executive:      'view',
     surveyor:             'none',
     inventory_manager:    'none',
     installation_manager: 'view',
     technician:           'none',
     finance_officer:      'full',
-    service_manager:      'none',
+    service_manager:      'view',
   },
 
   user_management: {

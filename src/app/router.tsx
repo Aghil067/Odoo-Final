@@ -106,6 +106,19 @@ import { ServiceAssignmentsPage } from '../features/service/pages/ServiceAssignm
 import { MyServiceTasksPage } from '../features/service/pages/MyServiceTasksPage';
 import { ServiceHistoryPage } from '../features/service/pages/ServiceHistoryPage';
 
+// Module M09: Finance & Accounting Pages
+import { FinanceDashboardPage } from '../features/finance/pages/FinanceDashboardPage';
+import { InvoicesPage } from '../features/finance/pages/InvoicesPage';
+import { InvoiceCreatePage } from '../features/finance/pages/InvoiceCreatePage';
+import { InvoiceEditPage } from '../features/finance/pages/InvoiceEditPage';
+import { InvoiceDetailsPage } from '../features/finance/pages/InvoiceDetailsPage';
+import { PaymentsPage } from '../features/finance/pages/PaymentsPage';
+import { ExpensesPage } from '../features/finance/pages/ExpensesPage';
+import { TechnicianPaymentsPage } from '../features/finance/pages/TechnicianPaymentsPage';
+import { InstallationProfitabilityPage } from '../features/finance/pages/InstallationProfitabilityPage';
+import { SubsidiesPage } from '../features/finance/pages/SubsidiesPage';
+import { FinanceReportsPage } from '../features/finance/pages/FinanceReportsPage';
+
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
   {
@@ -275,14 +288,22 @@ export const router = createBrowserRouter([
             ],
           },
 
-          // Finance
+          // ── Module M09: Finance & Accounting ──────────────────────
           {
             element: <ProtectedRoute module="finance" />,
             children: [
-              {
-                path: '/finance',
-                element: <PlaceholderPage moduleName="Finance" moduleKey="finance" />,
-              },
+              { path: '/finance', element: <Navigate to="/finance/dashboard" replace /> },
+              { path: '/finance/dashboard', element: <FinanceDashboardPage /> },
+              { path: '/finance/invoices', element: <InvoicesPage /> },
+              { path: '/finance/invoices/new', element: <InvoiceCreatePage /> },
+              { path: '/finance/invoices/:id', element: <InvoiceDetailsPage /> },
+              { path: '/finance/invoices/:id/edit', element: <InvoiceEditPage /> },
+              { path: '/finance/payments', element: <PaymentsPage /> },
+              { path: '/finance/expenses', element: <ExpensesPage /> },
+              { path: '/finance/technician-payments', element: <TechnicianPaymentsPage /> },
+              { path: '/finance/profitability', element: <InstallationProfitabilityPage /> },
+              { path: '/finance/subsidies', element: <SubsidiesPage /> },
+              { path: '/finance/reports', element: <FinanceReportsPage /> },
             ],
           },
 
