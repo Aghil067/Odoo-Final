@@ -22,4 +22,20 @@ UI should obtain eligible SURVEY_REQUESTED leads from M01; render visit-needed a
 
 No M03 models, quotations, BOMs or component configuration are implemented. A later approved M03 implementation must use `/api/surveys/:id/approved`, retain surveyId/approvedVersion/reviewId, and respect recommendation conditions/assumptions. The guard rejects unapproved, superseded, archived-customer or ineligible-lead records. An old immutable audit snapshot is not approval for a new assessment.
 
+## Latest main incorporated for PR review
+
+The M02 branch now includes main's frontend commit `23c4cd2` through conflict-free merge `4ce1b37`. Its frontend source/configuration is preserved exactly; the M02 PR adds no changes to those files. That frontend commit provides M01 CRM and M02 survey screens but uses in-memory mock services, not the real PostgreSQL-backed backend yet.
+
+Before enabling real API integration, reconcile these concrete differences deliberately:
+
+| Existing frontend | Implemented backend |
+|---|---|
+| `draft`, separate `assigned`, `reinspection_required`, `cancelled` and other lowercase statuses | Exact uppercase state graph beginning REQUESTED; assignment is a versioned event, not a distinct lifecycle state; revisions use REVISION_REQUIRED and cancellation uses CANCELED. |
+| Square-foot roof measurements, orientation text/slope categories, numeric capacity | Square-metre decimal strings, measured azimuth/tilt in degrees and decimal-string capacity. Convert units explicitly; do not invent engineering measurements or infer a roof certification boolean. |
+| Eight lowercase frontend roles, including `surveyor` | Six uppercase backend roles; ADMIN explicitly assigns existing TECHNICIAN users. No string rename grants authorization. |
+| Local mock identifiers, stores and photo presentation | Real API UUIDs, scoped/paginated data, latest survey versions, private raw-file upload and authenticated download endpoints. |
+| Provisional auth envelopes | Actual `{data:...}` responses, HttpOnly cookie, trusted Origin and X-CSRF-Token; no refresh-token endpoint. |
+
+This merge/review does not connect or rewrite the frontend, apply a database migration or implement M03. Both projects pass their production builds; full-stack/runtime validation remains pending explicit authorization.
+
 See [technical documentation](../backend/docs/modules/M02_SITE_SURVEY_TECHNICAL_DOCUMENTATION.md), [code walkthrough](../backend/docs/modules/M02_SITE_SURVEY_CODE_EXPLANATION.md), [evaluator Q&A](../backend/docs/evaluator/M02_EVALUATOR_QA.md), and [verification/file inventory](../backend/docs/M02_VERIFICATION.md). Runtime behavior, migration execution, concurrency, cookies/CSRF and file handling still require explicitly authorized testing. Stop after M02.

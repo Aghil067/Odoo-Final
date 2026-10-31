@@ -28,7 +28,7 @@ export function assignSurveyor(user: Principal, id: string, input: z.infer<typeo
     return saveSurvey(tx, user, current, {
       assignedToId: input.assignedToId, assignmentNotes: input.assignmentNotes,
       ...(current.status === 'REVISION_REQUIRED' ? { scheduledAt: null, scheduledEndAt: null, expectedDurationMinutes: null, visitStatus: 'NOT_SCHEDULED' } : {}),
-    }, 'ASSIGNED', input.reason, { previousAssignedToId: current.assignedToId, assignedToId: input.assignedToId, assignmentNotes: input.assignmentNotes ?? current.assignmentNotes, previousScheduledAt: current.scheduledAt });
+    }, 'ASSIGNED', input.reason, { previousAssignedToId: current.assignedToId, assignedToId: input.assignedToId, assignmentNotes: input.assignmentNotes === undefined ? current.assignmentNotes : input.assignmentNotes, previousScheduledAt: current.scheduledAt });
   });
 }
 
