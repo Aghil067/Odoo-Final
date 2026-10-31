@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+  TECHNICIAN
+  WAREHOUSE
+  SUPPORT
+  FINANCE
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+}
+
+enum LeadSource {
+  WEBSITE
+  PHONE
+  WALK_IN
+  REFERRAL
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  SURVEY_REQUESTED
+  LOST
+  DISQUALIFIED
+}
+
+enum LeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SystemType {
+  ON_GRID
+  OFF_GRID
+  UNDECIDED
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  FOLLOW_UP
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(254)
+  name         String   @db.VarChar(120)
+  passwordHash String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  sessions     Session[]
+  customers    Customer[]
+  createdLeads Lead[] @relation("LeadCreator")
+  assignedLeads Lead[] @relation("LeadSalesperson")
+  activities   LeadActivity[]
+  statusHistory LeadStatusHistory[]
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique @db.Char(64)
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Customer {
+  id              String       @id @default(uuid()) @db.Uuid
+  reference       String       @unique @db.VarChar(40)
+  type            CustomerType @default(INDIVIDUAL)
+  name            String       @db.VarChar(160)
+  phone           String       @db.VarChar(40)
+  normalizedPhone String       @db.VarChar(16)
+  email           String?      @db.VarChar(254)
+  companyName     String?      @db.VarChar(160)
+  notes           String?      @db.VarChar(5000)
+  isArchived      Boolean      @default(false)
+  archivedAt      DateTime?    @db.Timestamptz(3)
+  version         Int          @default(1)
+  createdById     String       @db.Uuid
+  createdBy       User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(3)
+  sites           Site[]
+  leads           Lead[]
+  @@index([normalizedPhone])
+  @@index([email])
+  @@index([createdById, isArchived])
+  @@index([isArchived, createdAt, id])
+  @@index([type])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([reference(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([companyName(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model Site {
+  id            String   @id @default(uuid()) @db.Uuid
+  customerId    String   @db.Uuid
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  name          String   @db.VarChar(160)
+  addressLine1  String   @db.VarChar(250)
+  addressLine2  String?  @db.VarChar(250)
+  city          String   @db.VarChar(100)
+  state         String   @db.VarChar(100)
+  postalCode    String   @db.VarChar(20)
+  country       String   @db.Char(2)
+  landmark      String?  @db.VarChar(250)
+  propertyNotes String?  @db.VarChar(5000)
+  latitude      Decimal? @db.Decimal(9, 6)
+  longitude     Decimal? @db.Decimal(9, 6)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  leads         Lead[]
+  @@unique([id, customerId])
+  @@index([customerId, createdAt, id])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model Lead {
+  id                     String       @id @default(uuid()) @db.Uuid
+  reference              String       @unique @db.VarChar(40)
+  customerId             String       @db.Uuid
+  customer               Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  siteId                 String       @db.Uuid
+  site                   Site         @relation(fields: [siteId, customerId], references: [id, customerId], onDelete: Restrict)
+  source                 LeadSource
+  status                 LeadStatus   @default(NEW)
+  priority               LeadPriority @default(MEDIUM)
+  requestedCapacityKw    Decimal?     @db.Decimal(10, 3)
+  preferredSystemType    SystemType   @default(UNDECIDED)
+  monthlyElectricityBill Decimal?     @db.Decimal(14, 2)
+  assignedToId           String?      @db.Uuid
+  assignedTo             User?        @relation("LeadSalesperson", fields: [assignedToId], references: [id], onDelete: Restrict)
+  createdById            String       @db.Uuid
+  createdBy              User         @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  qualificationNotes     String?      @db.VarChar(5000)
+  nextFollowUpAt         DateTime?    @db.Timestamptz(3)
+  closedReason           String?      @db.VarChar(2000)
+  version                Int          @default(1)
+  createdAt              DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime     @updatedAt @db.Timestamptz(3)
+  activities             LeadActivity[]
+  statusHistory          LeadStatusHistory[]
+  @@index([customerId])
+  @@index([siteId, customerId])
+  @@index([status, createdAt, id])
+  @@index([assignedToId, status])
+  @@index([createdById])
+  @@index([source])
+  @@index([priority])
+  @@index([nextFollowUpAt])
+  @@index([reference(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([qualificationNotes(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model LeadActivity {
+  id          String       @id @default(uuid()) @db.Uuid
+  leadId      String       @db.Uuid
+  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  actorId     String       @db.Uuid
+  actor       User         @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  type        ActivityType
+  description String       @db.VarChar(5000)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  @@index([leadId, createdAt, id])
+  @@index([actorId])
+}
+
+model LeadStatusHistory {
+  id         String     @id @default(uuid()) @db.Uuid
+  leadId     String     @db.Uuid
+  lead       Lead       @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  actorId    String     @db.Uuid
+  actor      User       @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  fromStatus LeadStatus?
+  toStatus   LeadStatus
+  reason     String?    @db.VarChar(2000)
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+  @@index([leadId, createdAt, id])
+  @@index([actorId])
+}

@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+
+# Local credentials and private keys
+.envrc
+.secrets/
+secrets/
+credentials/
+credentials*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local database files, dumps and data directories (keep Prisma migration SQL)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.dump
+*.backup
+pgdata/
+postgres-data/
