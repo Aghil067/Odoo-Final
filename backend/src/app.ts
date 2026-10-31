@@ -13,6 +13,7 @@ import { inventoryRouter } from './modules/inventory/routes.js';
 import { createWarrantyRouter } from './modules/warranties/routes.js';
 import { createServiceRouter } from './modules/service/routes.js';
 import { createFinanceRouter } from './modules/finance/routes.js';
+import { analyticsRouter } from './modules/analytics/routes.js';
 import { technicianRouter } from './modules/technicians/routes.js';
 import { solarRouter } from './modules/solar/routes.js';
 
@@ -41,6 +42,7 @@ app.use('/api/technicians', technicianRouter);
 app.use('/api/warranties', createWarrantyRouter());
 app.use('/api/service', createServiceRouter());
 app.use('/api/finance', createFinanceRouter());
+app.use('/api/analytics', analyticsRouter);
 app.use('/api', crmRouter);
 app.use((_req, _res, next) => next(new ApiError(404, 'NOT_FOUND', 'Endpoint not found')));
 app.use(errorHandler);
