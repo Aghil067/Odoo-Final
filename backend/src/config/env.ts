@@ -15,6 +15,8 @@ export function isPublicStoragePath(directory: string): boolean {
 }
 
 const envSchema = z.object({
+  SERVICE_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'service-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Service evidence must remain outside repository/public/build'),
+  SERVICE_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   DATABASE_URL: z.url().refine(value => /^postgres(ql)?:\/\//.test(value), 'PostgreSQL URL required'),
@@ -26,6 +28,8 @@ const envSchema = z.object({
   SESSION_HOURS: z.coerce.number().int().min(1).max(24).default(8),
   DEFAULT_PHONE_COUNTRY: z.string().default('IN').refine(isSupportedCountry, 'Unsupported phone country'),
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(3).default(0),
+  WARRANTY_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'warranty-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Warranty evidence must remain outside repository/public/build'),
+  WARRANTY_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
   INSTALLATION_STORAGE_DIR: z.string().min(1).default(join(homedir(), '.solar-installation', 'installation-uploads')).transform(value => resolve(value)).refine(value => !isPublicStoragePath(value), 'Installation storage must be outside repository/public/build paths'),
   INSTALLATION_MAX_FILE_BYTES: z.coerce.number().int().min(1024).max(10485760).default(5242880),
   SURVEY_STORAGE_ADAPTER: z.literal('local').default('local'),
