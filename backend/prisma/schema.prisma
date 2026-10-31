@@ -79,6 +79,13 @@ model User {
   surveyEvents SurveyStatusHistory[]
   surveyReviews SurveyReview[]
   surveyUploads SurveyAttachment[]
+  solarTemplates SolarSystemTemplate[]
+  solarComponents SolarComponent[]
+  solarConfigurations SolarConfiguration[] @relation("ConfigurationDesigner")
+  reviewedConfigurations SolarConfiguration[] @relation("ConfigurationReviewer")
+  configurationEvents SolarConfigurationHistory[]
+  configurationReviews SolarConfigurationReview[]
+  templateRevisions SolarTemplateRevision[]
 }
 
 model Session {
@@ -112,6 +119,7 @@ model Customer {
   sites           Site[]
   leads           Lead[]
   surveys         SiteSurvey[]
+  configurations  SolarConfiguration[]
   @@index([normalizedPhone])
   @@index([email])
   @@index([createdById, isArchived])
@@ -142,6 +150,7 @@ model Site {
   updatedAt     DateTime @updatedAt @db.Timestamptz(3)
   leads         Lead[]
   surveys       SiteSurvey[]
+  configurations SolarConfiguration[]
   @@unique([id, customerId])
   @@index([customerId, createdAt, id])
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
@@ -173,6 +182,7 @@ model Lead {
   activities             LeadActivity[]
   statusHistory          LeadStatusHistory[]
   surveys                SiteSurvey[]
+  configurations         SolarConfiguration[]
   @@unique([id, siteId, customerId])
   @@index([customerId])
   @@index([siteId, customerId])
@@ -351,6 +361,8 @@ model SiteSurvey {
   attachments            SurveyAttachment[]
   history                SurveyStatusHistory[]
   reviews                SurveyReview[]
+  configurations         SolarConfiguration[]
+  @@unique([id, leadId, siteId, customerId])
   @@unique([leadId, assessmentNumber])
   @@index([customerId])
   @@index([siteId, customerId])
@@ -451,6 +463,266 @@ model SurveyReview {
   checklist     Json
   snapshot      Json
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  configurations SolarConfiguration[]
+  @@unique([id, surveyId, surveyVersion])
   @@unique([surveyId, surveyVersion])
+  @@index([reviewerId])
+}
+
+enum SolarComponentCategory {
+  SOLAR_PANEL
+  INVERTER
+  BATTERY
+  CHARGE_CONTROLLER
+  MOUNTING_STRUCTURE
+  DC_CABLE
+  AC_CABLE
+  CONNECTOR
+  COMBINER_BOX
+  ISOLATOR
+  SURGE_PROTECTION
+  EARTHING
+  OTHER
+}
+
+enum SolarUnit {
+  PCS
+  M
+  SET
+  PAIR
+  KG
+}
+
+enum SolarConfigurationStatus {
+  DRAFT
+  READY_FOR_REVIEW
+  REVISION_REQUIRED
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum SolarPhase {
+  SINGLE_PHASE
+  THREE_PHASE
+}
+
+enum SolarReviewDecision {
+  APPROVED
+  REVISION_REQUIRED
+  REJECTED
+}
+
+model SolarComponent {
+  id             String @id @default(uuid()) @db.Uuid
+  sku            String @unique @db.VarChar(64)
+  name           String @db.VarChar(160)
+  category       SolarComponentCategory
+  manufacturer   String? @db.VarChar(160)
+  modelNumber    String? @db.VarChar(160)
+  description    String? @db.VarChar(2000)
+  specifications Json
+  specificationSource String? @db.VarChar(2000)
+  unit           SolarUnit
+  unitCost       Decimal @db.Decimal(18, 4)
+  currency       String @db.Char(3)
+  warrantyMonths Int?
+  serializationRequired Boolean @default(false)
+  lastChangeReason String @default("Catalog created") @db.VarChar(2000)
+  isActive       Boolean @default(true)
+  version        Int @default(1)
+  createdById    String @db.Uuid
+  createdBy      User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  templateLines  SolarTemplateComponent[]
+  bomLines       BOMLine[]
+  @@index([category, isActive])
+  @@index([createdById])
+}
+
+model SolarSystemTemplate {
+  id             String @id @default(uuid()) @db.Uuid
+  code           String @unique @db.VarChar(64)
+  name           String @db.VarChar(160)
+  description    String? @db.VarChar(2000)
+  systemType     SystemType
+  nominalCapacityKw Decimal @db.Decimal(10, 3)
+  minimumCapacityKw Decimal @db.Decimal(10, 3)
+  maximumCapacityKw Decimal @db.Decimal(10, 3)
+  validationPolicy Json
+  isActive       Boolean @default(true)
+  version        Int @default(1)
+  createdById    String @db.Uuid
+  createdBy      User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  components     SolarTemplateComponent[]
+  revisions      SolarTemplateRevision[]
+  @@index([systemType, isActive])
+  @@index([createdById])
+}
+
+model SolarTemplateComponent {
+  id             String @id @default(uuid()) @db.Uuid
+  templateId     String @db.Uuid
+  template       SolarSystemTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  componentId    String @db.Uuid
+  component      SolarComponent @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  defaultQuantity Decimal @db.Decimal(12, 3)
+  unit           SolarUnit
+  required       Boolean
+  notes          String? @db.VarChar(1000)
+  position       Int
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  @@unique([templateId, componentId])
+  @@unique([templateId, position])
+  @@index([componentId])
+}
+
+model SolarTemplateRevision {
+  id             String @id @default(uuid()) @db.Uuid
+  templateId     String @db.Uuid
+  template       SolarSystemTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  version        Int
+  actorId        String @db.Uuid
+  actor          User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  snapshot       Json
+  reason         String @db.VarChar(2000)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  configurations SolarConfiguration[]
+  @@unique([templateId, version])
+  @@index([actorId])
+}
+
+model SolarConfiguration {
+  id             String @id @default(uuid()) @db.Uuid
+  reference      String @unique @db.VarChar(40)
+  name           String @db.VarChar(160)
+  seriesId       String @default(uuid()) @db.Uuid
+  revisionNumber Int @default(1)
+  previousConfigurationId String? @unique @db.Uuid
+  previousConfiguration SolarConfiguration? @relation("ConfigurationRevision", fields: [previousConfigurationId], references: [id], onDelete: Restrict)
+  nextRevision   SolarConfiguration? @relation("ConfigurationRevision")
+  leadId         String @db.Uuid
+  lead           Lead @relation(fields: [leadId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  siteId         String @db.Uuid
+  site           Site @relation(fields: [siteId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  customerId     String @db.Uuid
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  approvedSurveyId String @db.Uuid
+  approvedSurveyVersion Int
+  survey         SiteSurvey @relation(fields: [approvedSurveyId, leadId, siteId, customerId], references: [id, leadId, siteId, customerId], onDelete: Restrict, onUpdate: Restrict)
+  surveyReviewId String @db.Uuid
+  surveyReview   SurveyReview @relation(fields: [surveyReviewId, approvedSurveyId, approvedSurveyVersion], references: [id, surveyId, surveyVersion], onDelete: Restrict, onUpdate: Restrict)
+  surveySnapshot Json
+  templateId     String? @db.Uuid
+  templateVersion Int?
+  templateRevision SolarTemplateRevision? @relation(fields: [templateId, templateVersion], references: [templateId, version], onDelete: Restrict, onUpdate: Restrict)
+  templateSnapshot Json?
+  systemType     SystemType
+  outputPhase    SolarPhase
+  targetCapacityKw Decimal @db.Decimal(10, 3)
+  calculatedDcCapacityKw Decimal? @db.Decimal(24, 6)
+  inverterAcCapacityKw Decimal? @db.Decimal(24, 6)
+  batteryNominalEnergyKwh Decimal? @db.Decimal(24, 6)
+  status         SolarConfigurationStatus @default(DRAFT)
+  technicalAssumptions String @db.VarChar(5000)
+  conditionalWorkRequirements String? @db.VarChar(5000)
+  validationPolicy Json
+  electricalDesign Json
+  validationReport Json
+  createdById    String @db.Uuid
+  createdBy      User @relation("ConfigurationDesigner", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewerId     String? @db.Uuid
+  reviewer       User? @relation("ConfigurationReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  approvedVersion Int?
+  version        Int @default(1)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  bom            BillOfMaterials?
+  history        SolarConfigurationHistory[]
+  reviews        SolarConfigurationReview[]
+  @@unique([seriesId, revisionNumber])
+  @@index([leadId])
+  @@index([siteId])
+  @@index([customerId])
+  @@index([approvedSurveyId, leadId, siteId, customerId])
+  @@index([surveyReviewId, approvedSurveyId, approvedSurveyVersion])
+  @@index([templateId, templateVersion])
+  @@index([status, createdAt, id])
+  @@index([createdById])
+  @@index([reviewerId])
+}
+
+model BillOfMaterials {
+  id             String @id @default(uuid()) @db.Uuid
+  reference      String @unique @db.VarChar(40)
+  configurationId String @unique @db.Uuid
+  configuration  SolarConfiguration @relation(fields: [configurationId], references: [id], onDelete: Restrict)
+  version        Int @default(1)
+  status         SolarConfigurationStatus @default(DRAFT)
+  totalEstimatedMaterialCost Decimal @default(0) @db.Decimal(24, 2)
+  currency       String @db.Char(3)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  lines          BOMLine[]
+}
+
+model BOMLine {
+  id             String @id @default(uuid()) @db.Uuid
+  bomId          String @db.Uuid
+  bom            BillOfMaterials @relation(fields: [bomId], references: [id], onDelete: Restrict)
+  componentId    String @db.Uuid
+  component      SolarComponent @relation(fields: [componentId], references: [id], onDelete: Restrict)
+  componentVersion Int
+  skuSnapshot    String @db.VarChar(64)
+  descriptionSnapshot String @db.VarChar(2400)
+  componentSnapshot Json
+  category       SolarComponentCategory
+  quantity       Decimal @db.Decimal(12, 3)
+  unit           SolarUnit
+  unitCostSnapshot Decimal @db.Decimal(18, 4)
+  currency       String @db.Char(3)
+  lineTotal      Decimal @db.Decimal(24, 2)
+  technicalNotes String? @db.VarChar(1000)
+  position       Int
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([bomId, componentId])
+  @@unique([bomId, position])
+  @@index([componentId])
+}
+
+model SolarConfigurationHistory {
+  id             String @id @default(uuid()) @db.Uuid
+  configurationId String @db.Uuid
+  configuration  SolarConfiguration @relation(fields: [configurationId], references: [id], onDelete: Restrict)
+  actorId        String @db.Uuid
+  actor          User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  event          String @db.VarChar(40)
+  fromStatus     SolarConfigurationStatus?
+  toStatus       SolarConfigurationStatus
+  version        Int
+  reason         String @db.VarChar(2000)
+  details        Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([configurationId, version])
+  @@index([actorId])
+}
+
+model SolarConfigurationReview {
+  id             String @id @default(uuid()) @db.Uuid
+  configurationId String @db.Uuid
+  configuration  SolarConfiguration @relation(fields: [configurationId], references: [id], onDelete: Restrict)
+  reviewerId     String @db.Uuid
+  reviewer       User @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision       SolarReviewDecision
+  configurationVersion Int
+  notes          String @db.VarChar(5000)
+  checklist      Json
+  snapshot       Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([configurationId, configurationVersion])
   @@index([reviewerId])
 }

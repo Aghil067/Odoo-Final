@@ -1,6 +1,6 @@
 # Solar Installation Management — M01
 
-Backend only: Express 5, TypeScript, PostgreSQL, Prisma 6 and Zod 4. Includes Foundation, M01 CRM and M02 site surveys. Abisha's React frontend is at the repository root and remains independently managed. No M03–M10 implementation, seeds or demo records are included.
+Backend only: Express 5, TypeScript, PostgreSQL, Prisma 6 and Zod 4. Includes Foundation, M01 CRM, M02 site surveys and M03 solar configuration/BOM. Abisha's React frontend is at the repository root and remains independently managed. No M04–M10 backend implementation, seeds or demo records are included.
 
 ## Requirements and setup
 
@@ -42,3 +42,11 @@ M02 reuses the existing sessions and roles: ADMIN coordinates/reviews, explicitl
 Private local evidence defaults to `~/.solar-installation/survey-uploads`, outside the repository. Optional `SURVEY_STORAGE_DIR` must also remain outside the frontend repository/public/build directories. The application creates it lazily at real upload/retrieval time; no sample files or folders are created during static verification. Configure private volume permissions/Windows ACLs, retention, scanning and backups before live use. Default file limit is 5 MiB, configurable up to 10 MiB. Upload/downloads are authenticated; no private root is mounted publicly.
 
 Architecture/API indexes: [database design](docs/architecture/DATABASE_DESIGN.md), [API contracts](docs/architecture/API_CONTRACTS.md). Review the repository-level `docs/M02_BACKEND_HANDOFF.md` for the existing frontend's role/auth mismatch and integration steps. M03 consumes only the guarded approved-survey handoff after explicit authorization to implement that module.
+
+## M03 solar configuration and BOM
+
+M03 depends on M02 PR #2, which was open when this branch was created. Merge/review M02 first and retain migration order. `20261031000300_m03_solar_configuration` is generated but NOT applied. No default components/templates/configurations are seeded. Do not deploy M03 against a database missing either prerequisite migration.
+
+Read [code explanation](docs/modules/M03_SOLAR_CONFIGURATION_CODE_EXPLANATION.md), [technical documentation](docs/modules/M03_SOLAR_CONFIGURATION_TECHNICAL_DOCUMENTATION.md), [frontend contract](docs/integration/M03_FRONTEND_API_CONTRACT.md), [evaluator Q&A](docs/evaluator/M03_EVALUATOR_QA.md) and [verification/dependency record](docs/M03_VERIFICATION.md). Run existing generate/validate/typecheck/build commands from backend/. This module adds no dependencies or environment secrets.
+
+ADMIN manages catalog/templates and independently reviews designs; ADMIN or an assigned-survey TECHNICIAN may design. An author/editor cannot approve the same revision. M02 conditions are preserved, critical unknown compatibility blocks approval, and material costs use Decimal snapshots. The existing React configuration services still use mocks and incompatible category/status/unit/cost conventions; they require the documented adapter work, not a second frontend. Existing M04 frontend screens are unchanged; no stock quantities/reservations/serial movements are implemented in the backend.

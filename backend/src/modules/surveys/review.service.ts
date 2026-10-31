@@ -58,7 +58,11 @@ export function reviewSurvey(user: Principal, id: string, input: z.infer<typeof 
   });
 }
 export function approvedSurvey(user: Principal, id: string) {
-  return surveyAtomic(async tx => {
+  return surveyAtomic(tx => requireApprovedSurvey(tx, user, id));
+}
+
+// Shared with M03 so approval eligibility is checked inside the caller's transaction.
+export async function requireApprovedSurvey(tx: Transaction, user: Principal, id: string) {
     const survey = await requireSurvey(tx, user, id);
     if (survey.status !== 'APPROVED' || survey.approvedVersion === null) throw new ApiError(409, 'SURVEY_NOT_APPROVED', 'This assessment has no approved M03 handoff');
     const customer = await tx.customer.findUniqueOrThrow({ where: { id: survey.customerId }, select: { isArchived: true } });
@@ -73,5 +77,4 @@ export function approvedSurvey(user: Principal, id: string) {
       additionalWorkRequired: survey.additionalWorkRequired, technicalAssumptions: survey.technicalAssumptions, approvalChecklist: review.checklist,
       snapshot: review.snapshot, approvalScope: 'INTERNAL_PRELIMINARY_FEASIBILITY',
     };
-  });
 }

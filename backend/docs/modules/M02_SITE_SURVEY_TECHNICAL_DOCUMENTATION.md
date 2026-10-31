@@ -1,5 +1,7 @@
 # M02 solar site survey — technical documentation
 
+M03 integration update: the M02 approved-handoff logic is now exposed as `requireApprovedSurvey(tx,user,id)` for atomic reuse by the M03 caller; existing `approvedSurvey(user,id)` and its HTTP payload/permissions are unchanged. M03 is a dependent feature of unmerged M02 PR #2 at branch creation. See [M03 documentation](M03_SOLAR_CONFIGURATION_TECHNICAL_DOCUMENTATION.md); historical future-tense M03 notes below describe the original M02 boundary.
+
 M02 records a real installation location's field observations and preliminary internal feasibility. It follows M01 commercial qualification and stops before M03 component selection/BOM/configuration. It does not calculate structural load certification, grant utility/government permission or claim commissioning.
 
 ## Architecture and relationships
