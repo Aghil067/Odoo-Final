@@ -1,0 +1,67 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { FinanceInvoiceStatus, FinanceQuoteStatus, FinancePaymentStatus } from '@prisma/client';
+import { authenticate, requireCsrf, actor } from '../auth/auth.js';
+import { ApiError } from '../../lib/http.js';
+import { snapshot, type Context } from './common.js';
+import { query, projectKeys, pages, statuses, priorities, path, type Query } from './validation.js';
+import { overview } from './overview.service.js';
+import { salesSummary, salesTrends, conversions } from './sales.service.js';
+import { surveys } from './surveys.service.js';
+import { solar } from './solar.service.js';
+import { inventory } from './inventory.service.js';
+import { installations } from './installations.service.js';
+import { technicians } from './technicians.service.js';
+import { warranties } from './warranties.service.js';
+import { service } from './service.service.js';
+import * as finance from './finance.service.js';
+import { alerts } from './alerts.service.js';
+import { projectReport, customerReport, operations } from './reports.service.js';
+export const analyticsRouter = Router();
+analyticsRouter.use(authenticate, requireCsrf);
+type Parser = {
+    parse: (input: unknown) => Partial<Query>;
+};
+function get(url: string, schema: Parser, work: (c: Context) => Promise<unknown>, forwardDays?: number) { analyticsRouter.get(url, async (req, res) => { const input = schema.parse(req.query), now = new Date(); const defaults = forwardDays ? { from: now.toISOString(), to: new Date(now.getTime() + forwardDays * 86400000).toISOString() } : {}; return res.json(await snapshot(actor(req), { ...defaults, ...input }, work)); }); }
+const composite = query([...projectKeys, 'currency']);
+get('/overview', composite, overview);
+const sales = query(projectKeys, statuses.sales, priorities.sales);
+get('/sales/summary', sales, salesSummary);
+get('/sales/funnel', sales, conversions);
+get('/sales/trends', query([...projectKeys, 'groupBy'], statuses.sales, priorities.sales), salesTrends);
+get('/sales/conversions', sales, conversions);
+const survey = query(projectKeys, statuses.surveys);
+get('/surveys/summary', survey, c => surveys(c));
+get('/surveys/trends', query([...projectKeys, 'groupBy'], statuses.surveys), c => surveys(c, true));
+get('/solar/summary', query(projectKeys, statuses.solar), c => solar(c, 'summary'));
+get('/solar/capacity', query(projectKeys, statuses.solar), c => solar(c, 'capacity'));
+get('/solar/components', query([...projectKeys, 'currency', ...pages], statuses.solar), c => solar(c, 'components'));
+for (const mode of ['summary', 'warehouses', 'low-stock'] as const)
+    get(`/inventory/${mode}`, query(mode === 'summary' ? ['warehouseId'] : ['warehouseId', ...pages]), c => inventory(c, mode));
+get('/inventory/movements', query(['from', 'to', 'groupBy', 'warehouseId', ...pages], statuses.movements), c => inventory(c, 'movements'));
+for (const mode of ['summary', 'trends', 'milestones', 'blockers'] as const)
+    get(`/installations/${mode}`, query([...projectKeys, ...(mode === 'trends' ? ['groupBy' as const] : []), ...(mode === 'milestones' || mode === 'blockers' ? pages : [])], statuses.installations), c => installations(c, mode));
+get('/technicians/summary', query(['from', 'to', 'technicianId']), c => technicians(c, 'summary'), 30);
+get('/technicians/workload', query(['from', 'to', 'technicianId', ...pages]), c => technicians(c, 'workload'), 7);
+analyticsRouter.get('/technicians/availability', async (req, res) => { const input = query(['from', 'to', 'technicianId', ...pages]).parse(req.query), now = new Date(); return res.json(await snapshot(actor(req), { from: now.toISOString(), to: new Date(now.getTime() + 86400000).toISOString(), ...input, pageSize: req.query.pageSize === undefined ? 5 : input.pageSize }, c => technicians(c, 'availability'))); });
+get('/technicians/certifications', query(['technicianId', 'days', ...pages]), c => technicians(c, 'certifications'));
+const warrantyKeys = ['from', 'to', 'customerId', 'siteId', 'installationId'] as const;
+get('/warranties/summary', query([...warrantyKeys], statuses.warranties), c => warranties(c, 'summary'));
+get('/warranties/expiring', query(['customerId', 'siteId', 'installationId', 'days', ...pages]), c => warranties(c, 'expiring'));
+get('/warranties/claims', query([...warrantyKeys], statuses.claims), c => warranties(c, 'claims'));
+for (const mode of ['summary', 'trends', 'sla'] as const)
+    get(`/service/${mode}`, query([...projectKeys, ...(mode === 'trends' ? ['groupBy' as const] : [])], statuses.service, priorities.service), c => service(c, mode));
+get('/service/maintenance', query(['from', 'to', 'customerId', 'siteId', 'installationId', ...pages]), c => service(c, 'maintenance'));
+const moneyKeys = ['from', 'to', 'customerId', 'siteId', 'installationId', 'currency'] as const;
+get('/finance/summary', query([...moneyKeys]), finance.financeSummary);
+get('/finance/quotations', query([...moneyKeys], z.enum(FinanceQuoteStatus)), finance.quotations);
+get('/finance/invoices', query([...moneyKeys, ...pages], z.enum(FinanceInvoiceStatus)), c => finance.invoiceBook(c));
+get('/finance/payments', query(['from', 'to', 'customerId', 'currency'], z.enum(FinancePaymentStatus)), finance.payments);
+get('/finance/receivables', query([...moneyKeys, ...pages]), c => finance.invoiceBook(c, true));
+get('/finance/expenses', query([...moneyKeys], z.enum(['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RECORDED', 'CANCELLED'])), finance.expenses);
+get('/finance/profitability', query([...moneyKeys, ...pages]), finance.profitability);
+get('/alerts', query([...projectKeys, 'currency', 'days', ...pages]), alerts);
+analyticsRouter.get('/reports/projects/:id', async (req, res) => res.json(await snapshot(actor(req), query(['from', 'to', 'currency', ...pages]).parse(req.query), c => projectReport(c, path.parse(req.params).id))));
+analyticsRouter.get('/reports/customers/:id', async (req, res) => res.json(await snapshot(actor(req), query(['from', 'to', 'currency', ...pages]).parse(req.query), c => customerReport(c, path.parse(req.params).id))));
+get('/reports/operations', composite, operations);
+analyticsRouter.use((_req, _res, next) => next(new ApiError(404, 'NOT_FOUND', 'Analytics endpoint not found')));

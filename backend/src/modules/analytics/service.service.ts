@@ -1,0 +1,28 @@
+import type { ServiceTicketStatus, ServicePriority } from '@prisma/client';
+import { slaStatus } from '../service/read.service.js';
+import { serviceWhere, requireDepartment } from './access.service.js';
+import { type Context, range, bounded, metric, series, averageDuration, page, paging, LIMIT } from './common.js';
+export async function service(c: Context, mode: 'summary' | 'trends' | 'sla' | 'maintenance') {
+    requireDepartment(c, 'service');
+    if (mode === 'maintenance') {
+        // M08 restricts maintenance-plan management reads to ADMIN. Ticket-scoped workers do not inherit plan access.
+        if (c.user.role !== 'ADMIN')
+            return { plans: null, occurrences: null, definition: 'M08 maintenance-plan reporting requires ADMIN', reason: 'FORBIDDEN_PLAN_SCOPE' };
+        const project = { id: c.q.installationId, customerId: c.q.customerId, siteId: c.q.siteId };
+        const where = { installation: project, status: 'ACTIVE', nextDueAt: { lt: c.to } }, overdue = { installation: project, status: 'ACTIVE', nextDueAt: { lt: c.asOf } };
+        return { ...page(await c.tx.serviceMaintenancePlan.findMany({ where, ...paging(c.q), select: { id: true, reference: true, installationId: true, nextDueAt: true, intervalDays: true }, orderBy: [{ nextDueAt: 'asc' }, { id: 'asc' }] }), await c.tx.serviceMaintenancePlan.count({ where }), c.q), overdue: metric(await c.tx.serviceMaintenancePlan.count({ where: overdue }), 'ServiceMaintenancePlan', 'ACTIVE plans with nextDueAt before asOf'), dueInInterval: metric(await c.tx.serviceMaintenancePlan.count({ where: { installation: project, status: 'ACTIVE', nextDueAt: range(c) } }), 'ServiceMaintenancePlan', 'ACTIVE plans whose nextDueAt falls in interval'), outstandingOccurrences: metric(await c.tx.serviceMaintenanceOccurrence.count({ where: { plan: { installation: project }, completedAt: null, cancelledAt: null, dueAt: { lt: c.asOf } } }), 'ServiceMaintenanceOccurrence', 'Created occurrences overdue without completion/cancellation'), notificationDelivery: 'NOT_IMPLEMENTED' };
+    }
+    const base = { AND: [serviceWhere(c), { status: c.q.status as ServiceTicketStatus | undefined, priority: c.q.priority as ServicePriority | undefined }] };
+    const where = { AND: [base, { openedAt: range(c) }] };
+    const rows = bounded(await c.tx.serviceTicket.findMany({ where, take: LIMIT + 1, orderBy: { id: 'asc' } }));
+    if (mode === 'trends') {
+        const events = bounded(await c.tx.serviceTicket.findMany({ where: { AND: [base, { OR: [{ resolvedAt: range(c) }, { closedAt: range(c) }] }] }, select: { resolvedAt: true, closedAt: true }, take: LIMIT + 1, orderBy: { id: 'asc' } }));
+        return { source: 'ServiceTicket', opened: series(c, rows.map(r => r.openedAt)), resolved: series(c, events.flatMap(r => r.resolvedAt ? [r.resolvedAt] : [])), closed: series(c, events.flatMap(r => r.closedAt ? [r.closedAt] : [])), definition: 'Observed current-cycle timestamps; reopening may clear prior cycle resolution, not a complete historical cycle ledger' };
+    }
+    if (mode === 'sla') {
+        const scoped = rows.filter(r => r.status !== 'CANCELLED'), states = scoped.map(r => slaStatus(r, c.asOf));
+        return { configured: metric(states.filter(s => s.configured).length, 'ServiceTicket.slaPolicyId', 'Configured SLA within opened cohort excluding cancelled'), unconfigured: metric(states.filter(s => !s.configured).length, 'ServiceTicket.slaPolicyId', 'No configured policy; no inferred deadline'), firstResponseBreaches: metric(states.filter(s => s.firstResponseBreached === true).length, 'ServiceTicket.firstResponseDueAt,firstResponseAt', 'M08 slaStatus comparison: observed response or asOf exceeds deadline'), resolutionBreaches: metric(states.filter(s => s.resolutionBreached === true).length, 'ServiceTicket.resolutionDueAt,resolvedAt', 'M08 slaStatus comparison: observed resolution or asOf exceeds deadline'), clock: 'ELAPSED_UTC_NO_PAUSE', firstResponseTime: averageDuration(scoped.map(r => ({ start: r.openedAt, end: r.firstResponseAt }))), resolutionTime: averageDuration(scoped.map(r => ({ start: r.openedAt, end: r.resolvedAt }))), definition: 'Latest M08 ticket cycle; holds do not pause clocks; nonnegative supported observations only' };
+    }
+    const open = rows.filter(r => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(r.status));
+    return { openTickets: metric(open.length, 'ServiceTicket.status', 'Current non-RESOLVED/CLOSED/CANCELLED within opened cohort'), criticalUnresolved: metric(open.filter(r => r.priority === 'CRITICAL').length, 'ServiceTicket.priority,status', 'CRITICAL tickets not resolved/closed/cancelled in opened cohort'), byStatus: await c.tx.serviceTicket.groupBy({ by: ['status'], where, _count: { _all: true }, orderBy: { status: 'asc' } }), byPriority: await c.tx.serviceTicket.groupBy({ by: ['priority'], where, _count: { _all: true }, orderBy: { priority: 'asc' } }), byCategory: await c.tx.serviceTicket.groupBy({ by: ['category'], where, _count: { _all: true }, orderBy: { category: 'asc' } }), scheduledVisits: metric(await c.tx.serviceVisit.count({ where: { AND: [{ ticket: base, status: 'SCHEDULED', scheduledStartAt: range(c) }, ...(c.user.role === 'TECHNICIAN' ? [{ userId: c.user.id }] : []), ...(c.q.technicianId ? [{ userId: c.q.technicianId }] : [])] } }), 'ServiceVisit', 'Authorized SCHEDULED visits starting in interval'), firstResponseTime: averageDuration(rows.map(r => ({ start: r.openedAt, end: r.firstResponseAt }))), resolutionTime: averageDuration(rows.map(r => ({ start: r.openedAt, end: r.resolvedAt }))), definition: 'Ticket current-state distribution; assignment/visit counts do not prove worked hours' };
+}
