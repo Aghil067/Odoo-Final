@@ -1,36 +1,7 @@
-/**
- * ConfigurationCreatePage.tsx
- * ─────────────────────────────────────────────────────────────
- * Page wrapper hosting the multi-step ConfigurationWizard.
- */
-
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '../../../components/ui/Button';
-import { ConfigurationWizard } from '../components/ConfigurationWizard';
-
-export function ConfigurationCreatePage() {
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">New Solar Configuration</h1>
-          <p className="text-sm text-slate-500">
-            Select an approved site survey, configure components, and generate the Bill of Materials (BOM).
-          </p>
-        </div>
-        <Link to="/configurations">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Back to Configurations
-          </Button>
-        </Link>
-      </div>
-
-      {/* Wizard */}
-      <ConfigurationWizard />
-    </div>
-  );
-}
-
+import {useEffect,useState} from 'react';
+import {Link,useNavigate,useSearchParams} from 'react-router-dom';
+import {useAuth} from '../../auth/hooks/useAuth';
+import {Card} from '../../../components/ui/Card';
+import {SolarConfigurationForm} from '../components/SolarConfigurationForm';
+import {solarConfigurations,type ConfigurationRecord} from '../services/solarClient';
+export function ConfigurationCreatePage(){const navigate=useNavigate(),[params]=useSearchParams(),{user}=useAuth(),previousId=params.get('revisionOf');const [previous,setPrevious]=useState<ConfigurationRecord|undefined>(),[loading,setLoading]=useState(!!previousId),[error,setError]=useState('');useEffect(()=>{if(previousId)solarConfigurations.get(previousId).then(setPrevious).catch(e=>setError(e.message)).finally(()=>setLoading(false));},[previousId]);if(!['admin','technician'].includes(user?.role??''))return <p role="alert">Only administrators or survey-authorized technicians may create designs.</p>;if(loading)return <p role="status">Loading configuration series...</p>;if(error)return <p role="alert" className="text-red-700">{error}</p>;return <div className="space-y-5 max-w-5xl mx-auto"><div><Link className="text-sm text-green-700" to="/configurations/list">Back to Configurations</Link><h1 className="text-2xl font-bold text-slate-800">{previous?'Create Configuration Revision':'Create Solar Configuration'}</h1><p className="text-sm text-slate-500">Use the exact approved survey and a versioned template or explicit custom design policy.</p></div><Card><SolarConfigurationForm previous={previous} onSave={async data=>{const result=previous?await solarConfigurations.revise(previous.id,data):await solarConfigurations.create(data);navigate(`/configurations/${result.configuration.id}`);}}/></Card></div>;}
