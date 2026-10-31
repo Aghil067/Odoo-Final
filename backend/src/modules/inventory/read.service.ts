@@ -39,7 +39,7 @@ export function serials(user:Principal,q:Query) {
   });
 }
 export function serialDetail(user:Principal,id:string) { reader(user);return inventoryAtomic(tx=>tx.inventorySerialUnit.findUniqueOrThrow({where:{id},include:{component:{select:{id:true,sku:true,name:true}},receiptOperation:{select:{id:true,reference:true,createdAt:true}},warehouse:true}})); }
-export function serialHistory(user:Principal,id:string,q:Query) { reader(user);return inventoryAtomic(async tx=>{await tx.inventorySerialUnit.findUniqueOrThrow({where:{id}});const where={serialUnitId:id};return {data:await tx.inventorySerialEvent.findMany({where,...paging(q),orderBy:{version:'desc'}}),pagination:pagination(q.page,q.pageSize,await tx.inventorySerialEvent.count({where}))};}); }
+export function serialHistory(user:Principal,id:string,q:Query) { reader(user);return inventoryAtomic(async tx=>{await tx.inventorySerialUnit.findUniqueOrThrow({where:{id}});const where={serialUnitId:id};return {data:await tx.inventorySerialEvent.findMany({where,...paging(q),include:{operation:{select:{id:true,reference:true,kind:true,actor:{select:{id:true,name:true}}}}},orderBy:{version:'desc'}}),pagination:pagination(q.page,q.pageSize,await tx.inventorySerialEvent.count({where}))};}); }
 export function reservations(user:Principal,q:Query) {return inventoryAtomic(async tx=>{
   const where:Prisma.StockReservationWhereInput={warehouseId:q.warehouseId,configurationId:q.configurationId,status:q.status,configuration:configurationScope(user)};
   return {data:await tx.stockReservation.findMany({where,select:reservationSelect,...paging(q),orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockReservation.count({where}))};
