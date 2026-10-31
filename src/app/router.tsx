@@ -1,32 +1,7 @@
 /**
  * router.tsx
  * ─────────────────────────────────────────────────────────────
- * Central React Router configuration.
- *
- * ROUTE HIERARCHY:
- *
- *  /login                    → LoginPage (public)
- *  /unauthorized             → UnauthorizedPage (public – shown after auth)
- *  /                         → ProtectedRoute (auth required)
- *    /                       → redirect to /dashboard
- *    AppLayout (shell)
- *      /dashboard            → DashboardPage
- *      /customers            → ProtectedRoute(customers) → PlaceholderPage
- *      /site-survey          → ProtectedRoute(site_survey) → PlaceholderPage
- *      /solar-config         → ProtectedRoute(solar_configuration) → PlaceholderPage
- *      /inventory            → ProtectedRoute(inventory) → PlaceholderPage
- *      /installations        → ProtectedRoute(installations) → PlaceholderPage
- *      /technicians          → ProtectedRoute(technicians) → PlaceholderPage
- *      /warranty             → ProtectedRoute(warranty) → PlaceholderPage
- *      /service              → ProtectedRoute(service_management) → PlaceholderPage
- *      /finance              → ProtectedRoute(finance) → PlaceholderPage
- *      /users                → ProtectedRoute(user_management) → PlaceholderPage
- *  *                         → NotFoundPage
- *
- * Adding a new route:
- *  1. Create the page component in src/features/<module>/
- *  2. Add a ProtectedRoute wrapper with the correct module key
- *  3. Add a nav item in src/config/navigation.ts
+ * Central React Router configuration updated for M02 Site Survey routes.
  */
 
 import { createBrowserRouter, Navigate } from 'react-router-dom';
@@ -37,6 +12,25 @@ import { LoginPage } from '../features/auth/pages/LoginPage';
 import { UnauthorizedPage } from '../features/auth/pages/UnauthorizedPage';
 import { NotFoundPage } from '../features/auth/pages/NotFoundPage';
 import { PlaceholderPage } from '../features/placeholders/PlaceholderPage';
+
+// Module M01: CRM Pages
+import { CRMDashboardPage } from '../features/crm/pages/CRMDashboardPage';
+import { CustomersPage } from '../features/crm/pages/CustomersPage';
+import { CustomerCreatePage } from '../features/crm/pages/CustomerCreatePage';
+import { CustomerDetailsPage } from '../features/crm/pages/CustomerDetailsPage';
+import { CustomerEditPage } from '../features/crm/pages/CustomerEditPage';
+import { EnquiriesPage } from '../features/crm/pages/EnquiriesPage';
+import { EnquiryCreatePage } from '../features/crm/pages/EnquiryCreatePage';
+import { EnquiryDetailsPage } from '../features/crm/pages/EnquiryDetailsPage';
+import { FollowUpsPage } from '../features/crm/pages/FollowUpsPage';
+
+// Module M02: Survey Pages
+import { SurveyDashboardPage } from '../features/surveys/pages/SurveyDashboardPage';
+import { SurveysPage } from '../features/surveys/pages/SurveysPage';
+import { SurveyCreatePage } from '../features/surveys/pages/SurveyCreatePage';
+import { SurveyDetailsPage } from '../features/surveys/pages/SurveyDetailsPage';
+import { SurveyExecutionPage } from '../features/surveys/pages/SurveyExecutionPage';
+import { SurveyApprovalPage } from '../features/surveys/pages/SurveyApprovalPage';
 
 export const router = createBrowserRouter([
   // ── Public routes ─────────────────────────────────────────────
@@ -51,10 +45,10 @@ export const router = createBrowserRouter([
 
   // ── Protected routes (authentication required) ────────────────
   {
-    element: <ProtectedRoute />,      // authentication guard only
+    element: <ProtectedRoute />, // authentication guard only
     children: [
       {
-        element: <AppLayout />,       // shared shell
+        element: <AppLayout />, // shared shell
         children: [
           // Root → redirect to dashboard
           { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -65,28 +59,38 @@ export const router = createBrowserRouter([
             element: <DashboardPage />,
           },
 
-          // Customers & CRM
+          // ── Module M01: Customers & CRM ───────────────────────────
           {
             element: <ProtectedRoute module="customers" />,
             children: [
-              {
-                path: '/customers',
-                element: <PlaceholderPage moduleName="Customers & CRM" moduleKey="customers" />,
-              },
+              { path: '/customers', element: <Navigate to="/crm" replace /> },
+              { path: '/crm', element: <CRMDashboardPage /> },
+              { path: '/crm/customers', element: <CustomersPage /> },
+              { path: '/crm/customers/new', element: <CustomerCreatePage /> },
+              { path: '/crm/customers/:id', element: <CustomerDetailsPage /> },
+              { path: '/crm/customers/:id/edit', element: <CustomerEditPage /> },
+              { path: '/crm/enquiries', element: <EnquiriesPage /> },
+              { path: '/crm/enquiries/new', element: <EnquiryCreatePage /> },
+              { path: '/crm/enquiries/:id', element: <EnquiryDetailsPage /> },
+              { path: '/crm/follow-ups', element: <FollowUpsPage /> },
             ],
           },
 
-          // Site Survey
+          // ── Module M02: Site Survey Management ────────────────────
           {
             element: <ProtectedRoute module="site_survey" />,
             children: [
-              {
-                path: '/site-survey',
-                element: <PlaceholderPage moduleName="Site Survey" moduleKey="site_survey" />,
-              },
+              { path: '/site-survey', element: <Navigate to="/surveys/dashboard" replace /> },
+              { path: '/surveys', element: <SurveysPage /> },
+              { path: '/surveys/dashboard', element: <SurveyDashboardPage /> },
+              { path: '/surveys/new', element: <SurveyCreatePage /> },
+              { path: '/surveys/:id', element: <SurveyDetailsPage /> },
+              { path: '/surveys/:id/edit', element: <SurveyExecutionPage /> },
+              { path: '/surveys/approvals', element: <SurveyApprovalPage /> },
             ],
           },
 
+          // ── Placeholder Modules ──────────────────────────────────
           // Solar Configuration
           {
             element: <ProtectedRoute module="solar_configuration" />,
@@ -185,4 +189,3 @@ export const router = createBrowserRouter([
     element: <NotFoundPage />,
   },
 ]);
-
