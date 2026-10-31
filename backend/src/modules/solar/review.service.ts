@@ -1,3 +1,6 @@
+import type { SolarConfiguration } from '@prisma/client';
+import type { Transaction } from '../../lib/db.js';
+import { eligibleApprovedSurvey } from '../surveys/review.service.js';
 import { z } from 'zod';
 import { ApiError } from '../../lib/http.js';
 import type { Principal } from '../auth/auth.js';
@@ -33,14 +36,18 @@ export function reviewConfiguration(user: Principal, id: string, input: z.infer<
   });
 }
 export function approvedConfiguration(user: Principal, id: string) {
-  return solarAtomic(async tx => {
-    const configuration = await requireConfiguration(tx, user, id);
+  return solarAtomic(async tx => approvedConfigurationRecord(tx, await requireConfiguration(tx, user, id)));
+}
+
+// Internal eligibility guard; inventory establishes RBAC/project scope before calling.
+export async function approvedConfigurationRecord(tx: Transaction, configuration: SolarConfiguration) {
+    const id = configuration.id;
     if (configuration.status !== 'APPROVED' || configuration.approvedVersion === null) throw new ApiError(409, 'CONFIGURATION_NOT_APPROVED', 'This configuration has no approved handoff');
-    await handoff(tx, user, configuration);
+    const survey = await eligibleApprovedSurvey(tx, await tx.siteSurvey.findUniqueOrThrow({ where: { id: configuration.approvedSurveyId } }));
+    if (survey.approvedVersion !== configuration.approvedSurveyVersion || survey.reviewId !== configuration.surveyReviewId) throw new ApiError(409, 'SURVEY_APPROVAL_MISMATCH', 'Use the exact survey approval');
     if (await tx.solarConfiguration.count({ where: { previousConfigurationId: id } })) throw new ApiError(409, 'CONFIGURATION_SUPERSEDED', 'A later revision exists; use its approval');
     const review = await tx.solarConfigurationReview.findUniqueOrThrow({ where: { configurationId_configurationVersion: { configurationId: id, configurationVersion: configuration.approvedVersion } } });
     if (review.decision !== 'APPROVED') throw new ApiError(409, 'CONFIGURATION_NOT_APPROVED', 'The persisted decision is not an approval');
     const bom = await tx.billOfMaterials.findUniqueOrThrow({ where: { configurationId: id }, include: { lines: { orderBy: { position: 'asc' } } } });
     return { configurationId: id, reference: configuration.reference, revisionNumber: configuration.revisionNumber, approvedVersion: configuration.approvedVersion, reviewId: review.id, approvedSurveyId: configuration.approvedSurveyId, approvedSurveyVersion: configuration.approvedSurveyVersion, surveyReviewId: configuration.surveyReviewId, surveyConditions: configuration.surveySnapshot, conditionalWorkRequirements: configuration.conditionalWorkRequirements, configuration, bom, approvalSnapshot: review.snapshot, scope: 'INTERNAL_PRELIMINARY_CONFIGURATION_NOT_REGULATORY_CERTIFICATION' };
-  });
 }

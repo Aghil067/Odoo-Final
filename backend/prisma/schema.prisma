@@ -68,6 +68,7 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  inventoryOperations InventoryOperation[]
   sessions     Session[]
   customers    Customer[]
   createdLeads Lead[] @relation("LeadCreator")
@@ -514,6 +515,10 @@ enum SolarReviewDecision {
 }
 
 model SolarComponent {
+  inventoryBalances InventoryBalance[]
+  inventorySerials InventorySerialUnit[]
+  stockReservationLines StockReservationLine[]
+  stockTransfers StockTransfer[]
   id             String @id @default(uuid()) @db.Uuid
   sku            String @unique @db.VarChar(64)
   name           String @db.VarChar(160)
@@ -597,6 +602,7 @@ model SolarTemplateRevision {
 }
 
 model SolarConfiguration {
+  stockReservations StockReservation[]
   id             String @id @default(uuid()) @db.Uuid
   reference      String @unique @db.VarChar(40)
   name           String @db.VarChar(160)
@@ -657,6 +663,7 @@ model SolarConfiguration {
 }
 
 model BillOfMaterials {
+  stockReservations StockReservation[]
   id             String @id @default(uuid()) @db.Uuid
   reference      String @unique @db.VarChar(40)
   configurationId String @unique @db.Uuid
@@ -671,6 +678,7 @@ model BillOfMaterials {
 }
 
 model BOMLine {
+  stockReservationLines StockReservationLine[]
   id             String @id @default(uuid()) @db.Uuid
   bomId          String @db.Uuid
   bom            BillOfMaterials @relation(fields: [bomId], references: [id], onDelete: Restrict)
@@ -725,4 +733,237 @@ model SolarConfigurationReview {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   @@unique([configurationId, configurationVersion])
   @@index([reviewerId])
+}
+
+enum StockMovementType {
+  OPENING_BALANCE
+  RECEIPT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  RESERVATION
+  RESERVATION_RELEASE
+  DISPATCH
+  RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  INSPECTION_RELEASE
+  QUARANTINE_DISPOSAL
+}
+enum InventorySerialState {
+  AVAILABLE
+  RESERVED
+  DISPATCHED
+  QUARANTINED
+  RETIRED
+}
+enum StockReservationStatus {
+  ACTIVE
+  RELEASED
+  CANCELLED
+  DISPATCHED
+}
+model Warehouse {
+  id String @id @default(uuid()) @db.Uuid
+  code String @unique @db.VarChar(64)
+  name String @db.VarChar(160)
+  address String @db.VarChar(2000)
+  contactName String? @db.VarChar(160)
+  contactPhone String? @db.VarChar(40)
+  contactEmail String? @db.VarChar(254)
+  isActive Boolean @default(true)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  balances InventoryBalance[]
+  serials InventorySerialUnit[]
+  reservations StockReservation[]
+  dispatches StockDispatch[]
+  transfersFrom StockTransfer[] @relation("TransferSource")
+  transfersTo StockTransfer[] @relation("TransferDestination")
+}
+model InventoryOperation {
+  id String @id @default(uuid()) @db.Uuid
+  idempotencyKey String @unique @db.VarChar(100)
+  kind String @db.VarChar(40)
+  reference String @db.VarChar(100)
+  requestHash String @db.Char(64)
+  actorId String @db.Uuid
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+  reason String @db.VarChar(2000)
+  payload Json
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  movements StockMovement[]
+  serialEvents InventorySerialEvent[]
+  receivedSerials InventorySerialUnit[]
+  reservations StockReservation[]
+  dispatches StockDispatch[]
+  transfer StockTransfer?
+  @@unique([kind,reference])
+  @@index([actorId,createdAt])
+}
+model InventoryBalance {
+  id String @id @default(uuid()) @db.Uuid
+  componentId String @db.Uuid
+  component SolarComponent @relation(fields:[componentId],references:[id],onDelete:Restrict)
+  warehouseId String @db.Uuid
+  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict)
+  serializationRequired Boolean
+  onHandQuantity Decimal @default(0) @db.Decimal(18,3)
+  reservedQuantity Decimal @default(0) @db.Decimal(18,3)
+  quarantinedQuantity Decimal @default(0) @db.Decimal(18,3)
+  reorderLevel Decimal @default(0) @db.Decimal(18,3)
+  reorderQuantity Decimal? @db.Decimal(18,3)
+  version Int @default(1)
+  lastMovementAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  movements StockMovement[]
+  @@unique([componentId,warehouseId])
+  @@index([warehouseId,componentId])
+}
+model StockMovement {
+  id String @id @default(uuid()) @db.Uuid
+  operationId String @db.Uuid
+  operation InventoryOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+  balanceId String @db.Uuid
+  balance InventoryBalance @relation(fields:[balanceId],references:[id],onDelete:Restrict)
+  type StockMovementType
+  quantity Decimal @db.Decimal(18,3)
+  onHandBefore Decimal @db.Decimal(18,3)
+  onHandAfter Decimal @db.Decimal(18,3)
+  reservedBefore Decimal @db.Decimal(18,3)
+  reservedAfter Decimal @db.Decimal(18,3)
+  quarantinedBefore Decimal @db.Decimal(18,3)
+  quarantinedAfter Decimal @db.Decimal(18,3)
+  reservationLineId String? @db.Uuid
+  reservationLine StockReservationLine? @relation(fields:[reservationLineId],references:[id],onDelete:Restrict)
+  dispatchLineId String? @db.Uuid
+  dispatchLine StockDispatchLine? @relation(fields:[dispatchLineId],references:[id],onDelete:Restrict)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  serialEvents InventorySerialEvent[]
+  @@index([balanceId,createdAt])
+  @@index([operationId])
+}
+model InventorySerialUnit {
+  id String @id @default(uuid()) @db.Uuid
+  serialNumber String @unique @db.VarChar(160)
+  componentId String @db.Uuid
+  component SolarComponent @relation(fields:[componentId],references:[id],onDelete:Restrict)
+  warehouseId String @db.Uuid
+  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict)
+  state InventorySerialState @default(AVAILABLE)
+  receiptOperationId String @db.Uuid
+  receiptOperation InventoryOperation @relation(fields:[receiptOperationId],references:[id],onDelete:Restrict)
+  receivedAt DateTime @db.Timestamptz(3)
+  reservationLineId String? @db.Uuid
+  reservationLine StockReservationLine? @relation(fields:[reservationLineId],references:[id],onDelete:Restrict)
+  dispatchLineId String? @db.Uuid
+  dispatchLine StockDispatchLine? @relation(fields:[dispatchLineId],references:[id],onDelete:Restrict)
+  version Int @default(1)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  events InventorySerialEvent[]
+  @@index([warehouseId,componentId,state])
+  @@index([reservationLineId])
+  @@index([dispatchLineId])
+}
+model InventorySerialEvent {
+  id String @id @default(uuid()) @db.Uuid
+  serialUnitId String @db.Uuid
+  serialUnit InventorySerialUnit @relation(fields:[serialUnitId],references:[id],onDelete:Restrict)
+  operationId String @db.Uuid
+  operation InventoryOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+  movementId String @db.Uuid
+  movement StockMovement @relation(fields:[movementId],references:[id],onDelete:Restrict)
+  version Int
+  fromState InventorySerialState?
+  toState InventorySerialState
+  fromWarehouseId String? @db.Uuid
+  toWarehouseId String @db.Uuid
+  reservationLineId String? @db.Uuid
+  dispatchLineId String? @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([serialUnitId,version])
+  @@index([operationId])
+}
+model StockReservation {
+  id String @id @default(uuid()) @db.Uuid
+  reference String @unique @db.VarChar(100)
+  configurationId String @db.Uuid
+  configuration SolarConfiguration @relation(fields:[configurationId],references:[id],onDelete:Restrict)
+  bomId String @db.Uuid
+  bom BillOfMaterials @relation(fields:[bomId],references:[id],onDelete:Restrict)
+  configurationVersion Int
+  configurationReviewId String @db.Uuid
+  bomVersion Int
+  handoffSnapshot Json
+  warehouseId String @db.Uuid
+  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict)
+  operationId String @db.Uuid
+  operation InventoryOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+  status StockReservationStatus @default(ACTIVE)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  lines StockReservationLine[]
+  dispatch StockDispatch?
+  @@index([configurationId,status])
+  @@index([warehouseId,status])
+}
+model StockReservationLine {
+  serialUnitIds String[] @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+  reservationId String @db.Uuid
+  reservation StockReservation @relation(fields:[reservationId],references:[id],onDelete:Restrict)
+  bomLineId String @db.Uuid
+  bomLine BOMLine @relation(fields:[bomLineId],references:[id],onDelete:Restrict)
+  componentId String @db.Uuid
+  component SolarComponent @relation(fields:[componentId],references:[id],onDelete:Restrict)
+  quantity Decimal @db.Decimal(18,3)
+  serials InventorySerialUnit[]
+  movements StockMovement[]
+  dispatchLine StockDispatchLine?
+  @@unique([reservationId,componentId])
+  @@unique([reservationId,bomLineId])
+}
+model StockDispatch {
+  id String @id @default(uuid()) @db.Uuid
+  reference String @unique @db.VarChar(100)
+  reservationId String @unique @db.Uuid
+  reservation StockReservation @relation(fields:[reservationId],references:[id],onDelete:Restrict)
+  warehouseId String @db.Uuid
+  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict)
+  operationId String @db.Uuid
+  operation InventoryOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+  status String @default("POSTED") @db.VarChar(20)
+  dispatchedAt DateTime @db.Timestamptz(3)
+  notes String? @db.VarChar(2000)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  lines StockDispatchLine[]
+}
+model StockDispatchLine {
+  serialUnitIds String[] @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
+  dispatchId String @db.Uuid
+  dispatch StockDispatch @relation(fields:[dispatchId],references:[id],onDelete:Restrict)
+  reservationLineId String @unique @db.Uuid
+  reservationLine StockReservationLine @relation(fields:[reservationLineId],references:[id],onDelete:Restrict)
+  quantity Decimal @db.Decimal(18,3)
+  returnedQuantity Decimal @default(0) @db.Decimal(18,3)
+  serials InventorySerialUnit[]
+  movements StockMovement[]
+  @@index([dispatchId])
+}
+model StockTransfer {
+  id String @id @default(uuid()) @db.Uuid
+  operationId String @unique @db.Uuid
+  operation InventoryOperation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+  sourceWarehouseId String @db.Uuid
+  sourceWarehouse Warehouse @relation("TransferSource",fields:[sourceWarehouseId],references:[id],onDelete:Restrict)
+  destinationWarehouseId String @db.Uuid
+  destinationWarehouse Warehouse @relation("TransferDestination",fields:[destinationWarehouseId],references:[id],onDelete:Restrict)
+  componentId String @db.Uuid
+  component SolarComponent @relation(fields:[componentId],references:[id],onDelete:Restrict)
+  quantity Decimal @db.Decimal(18,3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }

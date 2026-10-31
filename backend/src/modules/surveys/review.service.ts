@@ -1,3 +1,4 @@
+import type { SiteSurvey } from '@prisma/client';
 import { z } from 'zod';
 import type { Transaction } from '../../lib/db.js';
 import { ApiError } from '../../lib/http.js';
@@ -63,7 +64,12 @@ export function approvedSurvey(user: Principal, id: string) {
 
 // Shared with M03 so approval eligibility is checked inside the caller's transaction.
 export async function requireApprovedSurvey(tx: Transaction, user: Principal, id: string) {
-    const survey = await requireSurvey(tx, user, id);
+    return eligibleApprovedSurvey(tx, await requireSurvey(tx, user, id));
+}
+
+// Internal eligibility guard; callers establish their own module access scope first.
+export async function eligibleApprovedSurvey(tx: Transaction, survey: SiteSurvey) {
+    const id = survey.id;
     if (survey.status !== 'APPROVED' || survey.approvedVersion === null) throw new ApiError(409, 'SURVEY_NOT_APPROVED', 'This assessment has no approved M03 handoff');
     const customer = await tx.customer.findUniqueOrThrow({ where: { id: survey.customerId }, select: { isArchived: true } });
     const lead = await tx.lead.findUniqueOrThrow({ where: { id: survey.leadId }, select: { status: true } });
