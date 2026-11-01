@@ -5,6 +5,12 @@ import { installationAtomic,requireJob,scope } from './common.js';
 import { attachmentPublic,publicJob } from './policy.js';
 import * as v from './validation.js';
 import { z } from 'zod';
+export function assignees(user:Principal,q:z.infer<typeof v.page>&{q?:string;role:'ADMIN'|'TECHNICIAN'}){return installationAtomic(async tx=>{
+ if(user.role!=='ADMIN')throw new ApiError(403,'ADMIN_REQUIRED','Only coordinators select installation assignees');
+ const where:Prisma.UserWhereInput={isActive:true,role:q.role,...(q.q?{name:{contains:q.q,mode:'insensitive'}}:{})};
+ const data=await tx.user.findMany({where,select:{id:true,name:true,role:true},skip:(q.page-1)*q.pageSize,take:q.pageSize,orderBy:[{name:'asc'},{id:'asc'}]});
+ return {data,pagination:pagination(q.page,q.pageSize,await tx.user.count({where}))};
+});}
 export function listJobs(user:Principal,q:z.infer<typeof v.list>){return installationAtomic(async tx=>{
  const where:Prisma.InstallationJobWhereInput={AND:[scope(user),{status:q.status,customerId:q.customerId,leadId:q.leadId,siteId:q.siteId,...(q.q?{OR:[{name:{contains:q.q,mode:'insensitive'}},{reference:{contains:q.q,mode:'insensitive'}}]}:{})}]};
  const data=await tx.installationJob.findMany({where,skip:(q.page-1)*q.pageSize,take:q.pageSize,orderBy:[{createdAt:'desc'},{id:'desc'}]});
@@ -13,7 +19,7 @@ export function listJobs(user:Principal,q:z.infer<typeof v.list>){return install
 export function detail(user:Principal,id:string){return installationAtomic(async tx=>{
  const job=await requireJob(tx,user,id);
  if(user.role==='FINANCE')return publicJob(job);
- const data=await tx.installationJob.findUniqueOrThrow({where:{id},include:{assignments:{include:{user:{select:{id:true,name:true,role:true,isActive:true}}}},milestones:true,equipment:{include:{serials:{include:{serialUnit:{select:{serialNumber:true,state:true}}}}}}}});
+ const data=await tx.installationJob.findUniqueOrThrow({where:{id},include:{assignments:{include:{user:{select:{id:true,name:true,role:true,isActive:true}}}},milestones:true,equipment:{include:{component:{select:{id:true,name:true,sku:true,category:true}},serials:{include:{serialUnit:{select:{serialNumber:true,state:true}}}}}}}});
  return publicJob(data);
 });}
 export function summary(user:Principal){return installationAtomic(async tx=>({byStatus:await tx.installationJob.groupBy({by:['status'],where:scope(user),_count:{_all:true}}),blockingOpenIssues:await tx.installationIssue.count({where:{job:scope(user),status:'OPEN',OR:[{blocking:true},{severity:{in:['HIGH','CRITICAL']}}]}})}));}
@@ -24,7 +30,7 @@ export function collection(user:Principal,id:string,q:z.infer<typeof v.page>,kin
  let data:unknown,total:number;
  switch(kind){
  case 'milestones':data=await tx.installationMilestone.findMany({where,...paging,orderBy:{type:'asc'}});total=await tx.installationMilestone.count({where});break;
- case 'equipment':data=await tx.installationEquipment.findMany({where,...paging,include:{serials:{include:{serialUnit:{select:{serialNumber:true,state:true}}}}},orderBy:{id:'asc'}});total=await tx.installationEquipment.count({where});break;
+ case 'equipment':data=await tx.installationEquipment.findMany({where,...paging,include:{component:{select:{id:true,name:true,sku:true,category:true}},serials:{include:{serialUnit:{select:{serialNumber:true,state:true}}}}},orderBy:{id:'asc'}});total=await tx.installationEquipment.count({where});break;
  case 'issues':data=await tx.installationIssue.findMany({where,...paging,orderBy:[{reportedAt:'desc'},{id:'desc'}]});total=await tx.installationIssue.count({where});break;
  case 'tests':data=await tx.installationTest.findMany({where,...paging,orderBy:{jobVersion:'desc'}});total=await tx.installationTest.count({where});break;
  case 'attachments':data=await tx.installationAttachment.findMany({where,...paging,select:attachmentPublic,orderBy:[{createdAt:'desc'},{id:'desc'}]});total=await tx.installationAttachment.count({where});break;

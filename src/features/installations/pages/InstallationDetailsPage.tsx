@@ -1,575 +1,466 @@
-/**
- * InstallationDetailsPage.tsx
- * ─────────────────────────────────────────────────────────────
- * Master Installation Dossier for Module M05: Installation Management.
- * Provides deep links into M01 Customer, M02 Survey, M03 Configuration,
- * and M04 Warehouse Stock Issues & Serial numbers.
- */
-
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import {
-  Wrench,
-  ArrowLeft,
-  User,
-  MapPin,
-  ClipboardCheck,
-  Sun,
-  Layers,
-  Calendar,
-  ExternalLink,
-  ShieldCheck,
-  Truck,
-  FileCheck2,
-} from 'lucide-react';
-import type { Installation, InstallationStatus } from '../types/installation.types';
-import type { InstallationExecutionData } from '../types/execution.types';
-import { installationService } from '../services/installationService';
-import { installationExecutionService } from '../services/installationExecutionService';
-import { materialReadinessService } from '../services/materialReadinessService';
-import { InstallationProgress } from '../components/InstallationProgress';
-import { MaterialReadinessPanel } from '../components/MaterialReadinessPanel';
-import { MaterialIssuePanel } from '../components/MaterialIssuePanel';
-import { InstallationTimeline } from '../components/InstallationTimeline';
-import { ExecutionChecklist } from '../components/ExecutionChecklist';
-import { InstallationPhotoUpload } from '../components/InstallationPhotoUpload';
-import { TimeTrackingForm } from '../components/TimeTrackingForm';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
-
-type DossierTab =
-  | 'overview'
-  | 'materials'
-  | 'execution'
-  | 'photos'
-  | 'time'
-  | 'completion'
-  | 'timeline';
-
+import { installationClient, type InstallationJob, type InstallationAttachment, type InstallationIssue, type InstallationTest, type InstallationHistory, type CommissionedInstallation } from '../services/installationClient';
+import { InstallationActionForm, InstallationEvidenceForm, InstallationReadinessForm, InstallationReceiptForm, InstallationEquipmentForm, InstallationMilestoneForm, InstallationTestForm, InstallationIssueForm, InstallationIssueResolution, InstallationReviewForm, equipmentLabel } from '../components/InstallationWorkForms';
+import { InstallationPlanForm } from '../components/InstallationPlanForm';
+const title = (s: string) => s.replaceAll('_', ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+const date = (s: string | null | undefined) => s ? new Date(s).toLocaleString() : 'Not recorded';
+type AuditRecord = {
+  id: string;
+  actorId?: string;
+  receivedAt?: string;
+  createdAt?: string;
+  jobVersion: number;
+  notes?: string;
+  conditionalWorkResolution?: string;
+  outstandingIssues?: string | null;
+  checklist?: Record<string, boolean>;
+  evidenceIds?: string[];
+  snapshot?: {
+    equipmentId: string;
+    receivedQuantity: string;
+    damagedQuantity: string;
+    receivedSerialIds: string[];
+    damagedSerialIds: string[];
+  }[];
+};
 export function InstallationDetailsPage() {
-  const { id } = useParams<{ id: string }>();
-
-  const [installation, setInstallation] = useState<Installation | null>(null);
-  const [execution, setExecution] = useState<InstallationExecutionData | null>(null);
-  const [activeTab, setActiveTab] = useState<DossierTab>('overview');
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadData() {
-      if (!id) return;
-      try {
-        setIsLoading(true);
-        const [inst, exec] = await Promise.all([
-          installationService.getById(id),
-          installationExecutionService.getExecution(id),
-        ]);
-        setInstallation(inst);
-        setExecution(exec);
-      } catch (err) {
-        console.error('Failed to load installation dossier', err);
-      } finally {
-        setIsLoading(false);
+  const { id } = useParams(), { user } = useAuth(), [params, setParams] = useSearchParams(), tab = params.get('tab') ?? 'overview';
+  const [job, setJob] = useState<InstallationJob | null>(null), [files, setFiles] = useState<InstallationAttachment[]>([]), [handoff, setHandoff] = useState<CommissionedInstallation | null>(null), [error, setError] = useState(''), [loading, setLoading] = useState(true), [downloadError, setDownloadError] = useState('');
+  const finance = user?.role === 'finance_officer', admin = user?.role === 'admin', editor = admin || user?.role === 'technician';
+  const requestGeneration = useRef(0);
+  const invalidate = useCallback(() => { requestGeneration.current++; }, []);
+  const refresh = useCallback(async () => {
+    const generation = ++requestGeneration.current;
+    if (!id)
+      return;
+    const record = await installationClient.detail(id);
+    let attachments: InstallationAttachment[] = [];
+    if (!finance) {
+      for (let page = 1;page <= 3;page++) {
+        const result = await installationClient.collection<InstallationAttachment>(id, 'attachments', page);
+        attachments = attachments.concat(result.data);
+        if (attachments.length >= result.total)
+          break;
       }
     }
-    loadData();
-  }, [id]);
-
-  if (isLoading) {
-    return (
-      <div className="py-16 text-center text-xs text-slate-400">
-        Loading installation dossier...
-      </div>
-    );
-  }
-
-  if (!installation) {
-    return (
-      <div className="py-16 text-center text-xs text-slate-500 space-y-3">
-        <p>Installation work order not found.</p>
-        <Link to="/installations">
-          <Button size="sm" variant="outline">
-            Return to Work Orders
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
-  // Status transition handler
-  const handleStatusChange = async (newStatus: InstallationStatus, notes?: string) => {
-    const updated = await installationService.updateStatus(
-      installation.id,
-      newStatus,
-      notes,
-      'Kavita Menon'
-    );
-    setInstallation(updated);
-  };
-
-  // Re-check materials with M04 inventory
-  const handleRefreshReadiness = async () => {
-    const report = await materialReadinessService.evaluateReadiness(
-      installation.id,
-      installation.materials
-    );
-    const updated = await installationService.update(installation.id, {
-      overallMaterialReadiness: report.overallStatus,
-      materials: report.items,
+    const completed = record.status === 'COMMISSIONED' ? await installationClient.commissioned(id) : null;
+    if (generation !== requestGeneration.current) return;
+    setJob(record);
+    setFiles(attachments);
+    setHandoff(completed);
+    setError('');
+  }, [
+    id, finance
+  ]);
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    setError('');
+    refresh().catch(e => {
+      if (live)
+        setError(e.message);
+    }).finally(() => {
+      if (live)
+        setLoading(false);
     });
-    setInstallation(updated);
+    return () => {
+      live = false;
+      invalidate();
+    };
+  }, [
+    invalidate, refresh
+  ]);
+  if (loading)
+    return <p>Loading installation record...</p>;
+  if (error || !job)
+    return <Card>
+      <p role="alert" className="text-red-700">
+        {error || 'Installation unavailable.'}
+      </p>
+      <Button onClick={() => {
+        setLoading(true);
+        refresh().catch(e => setError(e.message)).finally(() => setLoading(false));
+      }}>Retry</Button>
+    </Card>;
+  const frozen = [
+    'COMMISSIONED', 'CANCELED', 'COMMISSIONING_REVIEW'
+  ].includes(job.status), writable = editor && !frozen, context = {
+    job, files, onSaved: refresh
   };
-
-  return (
-    <div className="space-y-6">
-      {/* Top Breadcrumb & Action bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Link
-            to="/installations"
-            className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                {installation.installationId}
-              </span>
-              <h1 className="text-lg font-bold text-slate-900">
-                {installation.title}
-              </h1>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Customer: <strong>{installation.customerName}</strong> • Site: {installation.siteCity}, {installation.siteState}
-            </p>
-          </div>
-        </div>
-
-        {/* Quick Execution & Completion Actions */}
-        <div className="flex items-center gap-2">
-          <Link to={`/installations/${installation.id}/execution`}>
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Wrench className="w-4 h-4" />}
-            >
-              Field Execution Screen
-            </Button>
-          </Link>
-
-          <Link to={`/installations/${installation.id}/completion`}>
-            <Button
-              size="sm"
-              variant="primary"
-              leftIcon={<FileCheck2 className="w-4 h-4" />}
-            >
-              Sign-off & Commissioning
-            </Button>
-          </Link>
-        </div>
+  const tabs = finance ? [
+    'overview', 'completion'
+  ] : [
+    'overview', 'plan', 'readiness', 'equipment', 'milestones', 'issues', 'evidence', 'tests', 'completion', 'history'
+  ];
+  const actions: {
+    action: string;
+    label: string;
+    states: string[];
+    admin?: boolean;
+  }[] = [
+      {
+        action: 'start', label: 'Start Installation', states: [
+          'SITE_READY', 'REWORK_REQUIRED'
+        ]
+      }, {
+        action: 'hold', label: 'Hold Installation', states: [
+          'IN_PROGRESS', 'TESTING', 'WORK_COMPLETED', 'REWORK_REQUIRED'
+        ]
+      }, {
+        action: 'resume', label: 'Resume Installation', states: [
+          'ON_HOLD'
+        ]
+      }, {
+        action: 'submit-completion', label: 'Submit Completed Work', states: [
+          'IN_PROGRESS', 'REWORK_REQUIRED'
+        ]
+      }, {
+        action: 'begin-testing', label: 'Begin Installation Testing', states: [
+          'WORK_COMPLETED'
+        ]
+      }, {
+        action: 'request-rework', label: 'Request Explicit Rework', states: [
+          'WORK_COMPLETED', 'TESTING', 'ON_HOLD'
+        ]
+      }, {
+        action: 'submit-commissioning', label: 'Submit for Independent Commissioning', states: [
+          'TESTING'
+        ]
+      }, {
+        action: 'cancel', label: 'Cancel Installation', states: [
+          'PLANNED', 'SITE_READY', 'ON_HOLD'
+        ], admin: true
+      }
+    ];
+  return <div className="space-y-5 max-w-7xl mx-auto">
+    <Link className="text-green-700" to="/installations">Back to Installations</Link>
+    <div className="flex flex-wrap justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">
+          {job.name}
+        </h1>
+        <p className="text-sm text-slate-500">
+          {job.reference} | Version {job.version}
+        </p>
       </div>
-
-      {/* Visual Workflow Progress Tracker */}
-      <InstallationProgress
-        currentStatus={installation.status}
-        canManage={true}
-        onStatusChange={handleStatusChange}
-      />
-
-      {/* Tab Navigation Navigation */}
-      <div className="border-b border-slate-200 flex items-center gap-2 overflow-x-auto text-xs font-semibold text-slate-600">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'overview'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          Overview & System Linkages
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('materials')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'materials'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>BOM & Material Issues ({installation.materials.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('execution')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'execution'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          <Wrench className="w-3.5 h-3.5" />
-          <span>Checklist & Issues ({execution?.checklists.length || 0})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('photos')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'photos'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          Photos ({execution?.photos.length || 0})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('time')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'time'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          Crew Time Logs ({execution?.timeRecords.length || 0})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('completion')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-            activeTab === 'completion'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Handover & Sign-off</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('timeline')}
-          className={`py-3 px-3.5 border-b-2 transition-colors whitespace-nowrap ${
-            activeTab === 'timeline'
-              ? 'border-green-600 text-green-700 font-bold'
-              : 'border-transparent hover:text-slate-900'
-          }`}
-        >
-          Activity Log ({installation.activities.length})
-        </button>
-      </div>
-
-      {/* TAB 1: OVERVIEW */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main 2 Cols: Customer, Survey, Configuration */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Customer & Site Integration Card (M01) */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-green-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Customer & Installation Site (M01 CRM)
-                  </h3>
-                </div>
-                <Link
-                  to={`/crm/customers/${installation.customerId}`}
-                  className="text-xs text-green-700 font-semibold hover:underline flex items-center gap-1"
-                >
-                  <span>Customer Record</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-400">Customer Name:</span>
-                  <div className="font-semibold text-slate-800 text-sm">{installation.customerName}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Phone:</span>
-                  <div className="font-semibold text-slate-800 font-mono">{installation.customerPhone}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Email:</span>
-                  <div className="font-semibold text-slate-800">{installation.customerEmail || 'N/A'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Site Contact Person:</span>
-                  <div className="font-semibold text-slate-800">
-                    {installation.siteContact.contactPerson} ({installation.siteContact.contactNumber})
-                  </div>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="text-slate-400">Installation Site Address:</span>
-                  <div className="font-medium text-slate-800 flex items-start gap-1 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span>{installation.siteAddress}, {installation.siteCity}, {installation.siteState} {installation.sitePincode}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Approved Survey Card (M02) */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <ClipboardCheck className="w-4 h-4 text-green-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Approved Technical Feasibility Survey (M02)
-                  </h3>
-                </div>
-                <Link
-                  to={`/surveys/${installation.surveyId}`}
-                  className="text-xs text-green-700 font-semibold hover:underline flex items-center gap-1"
-                >
-                  <span>Survey Report</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-400">Survey Ref:</span>
-                  <div className="font-mono font-bold text-slate-800">{installation.surveyRef}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Survey Date:</span>
-                  <div className="font-semibold text-slate-800">{installation.surveyDate || '2026-10-18'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Surveyor:</span>
-                  <div className="font-semibold text-slate-800">{installation.surveyorName || 'Vikram Singh'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Roof Area:</span>
-                  <div className="font-semibold text-slate-800">{installation.availableRoofAreaSqFt || 600} sq.ft</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Solar Configuration & BOM Card (M03) */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <Sun className="w-4 h-4 text-green-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Solar System Configuration & BOM (M03)
-                  </h3>
-                </div>
-                <Link
-                  to={`/configurations/${installation.configurationId}`}
-                  className="text-xs text-green-700 font-semibold hover:underline flex items-center gap-1"
-                >
-                  <span>Configuration BOM</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-400">Config ID:</span>
-                  <div className="font-mono font-bold text-slate-800">{installation.configurationRef}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">System Capacity:</span>
-                  <div className="font-bold text-emerald-700">{installation.systemCapacity}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">System Type:</span>
-                  <div className="font-semibold text-slate-800 capitalize">{installation.systemType.replace('_', ' ')}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Template:</span>
-                  <div className="font-semibold text-slate-800 truncate">{installation.templateName || 'Residential Standard'}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Col: Schedule & Crew Assignment */}
-          <div className="space-y-6">
-            {/* Schedule & Team Card */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-green-600" />
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Schedule & Team
-                  </h3>
-                </div>
-                <Link
-                  to="/installations/schedule"
-                  className="text-xs text-green-700 hover:underline font-semibold"
-                >
-                  Calendar
-                </Link>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-slate-400">Planned Start Date:</span>
-                  <div className="font-semibold text-slate-800">{installation.schedule.plannedStartDate}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Planned End Date:</span>
-                  <div className="font-semibold text-slate-800">{installation.schedule.plannedEndDate}</div>
-                </div>
-                {installation.schedule.actualStartDate && (
-                  <div>
-                    <span className="text-slate-400">Actual Execution Started:</span>
-                    <div className="font-semibold text-emerald-700">{installation.schedule.actualStartDate}</div>
-                  </div>
-                )}
-                <div>
-                  <span className="text-slate-400">Assigned Installation Crew:</span>
-                  <div className="font-semibold text-slate-800">{installation.schedule.assignedTeam || 'Unassigned (M06)'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Installation Manager:</span>
-                  <div className="font-semibold text-slate-800">{installation.schedule.installationManager}</div>
-                </div>
-              </div>
-
-              {/* Assigned Technicians list */}
-              {installation.schedule.assignedTechnicians && installation.schedule.assignedTechnicians.length > 0 && (
-                <div className="pt-2 border-t border-slate-100">
-                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Crew Members:
-                  </span>
-                  <div className="space-y-1">
-                    {installation.schedule.assignedTechnicians.map((tech) => (
-                      <div key={tech.id} className="text-xs flex justify-between bg-slate-50 p-1.5 rounded">
-                        <span className="font-medium text-slate-800">{tech.name}</span>
-                        <span className="text-slate-400 text-[11px]">{tech.role}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Access Card */}
-            <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-2 text-xs">
-              <div className="font-semibold text-slate-900 flex items-center gap-1.5">
-                <Truck className="w-4 h-4 text-emerald-600" />
-                <span>Inventory & Dispatches</span>
-              </div>
-              <p className="text-slate-500">
-                Materials are dispatched from warehouse locations via official M04 Stock Issue vouchers.
-              </p>
-              <Link
-                to="/inventory/issues"
-                className="text-emerald-700 font-semibold hover:underline flex items-center gap-1 pt-1"
-              >
-                <span>View M04 Stock Issues</span>
-                <ExternalLink className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: BOM & MATERIALS */}
-      {activeTab === 'materials' && (
-        <div className="space-y-6">
-          <MaterialReadinessPanel
-            materials={installation.materials}
-            overallStatus={installation.overallMaterialReadiness}
-            installationId={installation.id}
-            onRefreshReadiness={handleRefreshReadiness}
-          />
-          <MaterialIssuePanel
-            issueReferences={installation.materialIssueReferences}
-            installationId={installation.id}
-          />
-        </div>
-      )}
-
-      {/* TAB 3: EXECUTION & CHECKLIST */}
-      {activeTab === 'execution' && execution && (
-        <div className="space-y-6">
-          <ExecutionChecklist
-            items={execution.checklists}
-            onUpdateItem={async (itemId, status, remarks) => {
-              const updated = await installationExecutionService.updateChecklistItem(
-                installation.id,
-                itemId,
-                status,
-                remarks,
-                'Kavita Menon'
-              );
-              setExecution((prev) => (prev ? { ...prev, checklists: updated } : null));
-            }}
-          />
-        </div>
-      )}
-
-      {/* TAB 4: PHOTOGRAPHS */}
-      {activeTab === 'photos' && execution && (
-        <InstallationPhotoUpload
-          photos={execution.photos}
-          onAddPhoto={async (photo) => {
-            const added = await installationExecutionService.addPhoto(installation.id, photo);
-            setExecution((prev) => (prev ? { ...prev, photos: [added, ...prev.photos] } : null));
-          }}
-          onDeletePhoto={async (photoId) => {
-            await installationExecutionService.deletePhoto(installation.id, photoId);
-            setExecution((prev) => (prev ? { ...prev, photos: prev.photos.filter((p) => p.id !== photoId) } : null));
-          }}
-        />
-      )}
-
-      {/* TAB 5: TIME TRACKING */}
-      {activeTab === 'time' && execution && (
-        <TimeTrackingForm
-          records={execution.timeRecords}
-          onAddTimeRecord={async (rec) => {
-            const added = await installationExecutionService.addTimeRecord(installation.id, rec);
-            setExecution((prev) => (prev ? { ...prev, timeRecords: [added, ...prev.timeRecords] } : null));
-          }}
-        />
-      )}
-
-      {/* TAB 6: COMPLETION & SIGN-OFF */}
-      {activeTab === 'completion' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <Link to={`/installations/${installation.id}/completion`}>
-              <Button size="sm" variant="primary">
-                Open Full Sign-off Screen
-              </Button>
-            </Link>
-          </div>
-          {execution?.completion ? (
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3 text-xs">
-              <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
-                Submitted Completion Dossier
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>Testing: <strong className="text-emerald-700 uppercase">{execution.completion.testingResult}</strong></div>
-                <div>Actual Date: <strong>{execution.completion.actualCompletionDate}</strong></div>
-                <div>Customer Name: <strong>{execution.completion.customerName}</strong></div>
-                <div>Customer Confirmed: <strong>{execution.completion.customerConfirmation ? 'Yes' : 'No'}</strong></div>
-              </div>
-              <div className="p-3 bg-slate-50 rounded border">
-                <strong>Remarks:</strong> {execution.completion.workCompletionRemarks}
-              </div>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-xs text-slate-400 bg-white rounded-xl border border-slate-200">
-              No completion dossier has been submitted yet for this installation.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 7: TIMELINE */}
-      {activeTab === 'timeline' && (
-        <InstallationTimeline activities={installation.activities} />
-      )}
+      <span className="bg-green-50 text-green-800 px-3 py-2 rounded-lg font-medium">
+        {title(job.status)}
+      </span>
     </div>
-  );
+    <div className="flex flex-wrap gap-2 border-b pb-3">
+      {tabs.map(t => <Button variant={tab === t ? 'primary' : 'ghost'} key={t} onClick={() => setParams({
+        tab: t
+      })}>
+        {title(t)}
+      </Button>)}
+    </div>
+    <div key={job.version + ':' + tab} className="space-y-5">
+      {tab === 'overview' && <>
+        <div className="grid md:grid-cols-2 gap-5">
+          <Card>
+            <h2 className="font-semibold mb-3">Project and Handoff References</h2>
+            <dl className="space-y-2 text-sm">
+              {[
+                [
+                  'Customer', '/crm/customers/' + job.customerId
+                ], [
+                  'Approved Configuration', '/configurations/' + job.configurationId
+                ], [
+                  'Warehouse Dispatch', '/inventory/issues/' + job.dispatchId + '?kind=dispatch'
+                ]
+              ].map(([name, url]) => <div key={name}>
+                <dt className="text-slate-500">
+                  {name}
+                </dt>
+                <dd>
+                  <Link className="text-green-700" to={url}>
+                    {name} Record</Link>
+                </dd>
+              </div>)}
+              <dt>Site Identity</dt>
+              <dd className="break-all">
+                {job.siteId}
+              </dd>
+              <dt>Approved Configuration Version / BOM Version</dt>
+              <dd>
+                {job.configurationApprovedVersion} / {job.bomVersion}
+              </dd>
+            </dl>
+          </Card>
+          <Card>
+            <h2 className="font-semibold mb-3">Dates and Assigned Work</h2>
+            <dl className="space-y-2 text-sm">
+              {[
+                [
+                  'Planned Start', job.plannedStartAt
+                ], [
+                  'Planned End', job.plannedEndAt
+                ], [
+                  'Actual Start', job.actualStartAt
+                ], [
+                  'Actual End', job.actualEndAt
+                ], [
+                  'Physical Site Receipt', job.deliveryConfirmedAt
+                ], [
+                  'Internal Commissioning', job.commissionedAt
+                ]
+              ].map(([name, value]) => <div key={name}>
+                <dt className="text-slate-500">
+                  {name}
+                </dt>
+                <dd>
+                  {date(value)}
+                </dd>
+              </div>)}
+            </dl>
+            {job.assignments && <p className="text-sm mt-3">Assigned technicians: {job.assignments.map(a => a.user.name).join(', ') || 'None'}
+            </p>}
+          </Card>
+        </div>
+        <Card>
+          <h2 className="font-semibold">Safety and Readiness Notes</h2>
+          <p className="whitespace-pre-wrap mt-2">
+            {job.safetyNotes || 'No safety planning notes recorded.'}
+          </p>
+          <p className="whitespace-pre-wrap mt-2">
+            {job.siteReadinessNotes || 'No readiness planning notes recorded.'}
+          </p>
+          <p className="text-sm text-amber-800 mt-3">Warehouse dispatch is release only. Physical receipt, safety checks, installed equipment and required tests must be verified separately.</p>
+        </Card>
+        {writable && actions.filter(a => a.states.includes(job.status) && (!a.admin || admin)).map(a => <InstallationActionForm key={a.action} title={a.label} submit={async (reason) => {
+          await installationClient.command(job.id, a.action, {
+            version: job.version, reason
+          });
+          await refresh();
+        }}>
+          <p className="text-sm text-slate-500">The backend verifies prerequisites and preserves an audited versioned transition.</p>
+        </InstallationActionForm>)}
+      </>}
+      {tab === 'plan' && (writable ? <InstallationPlanForm job={job} admin={admin} onSaved={refresh} /> : <Card>This submitted or terminal plan is immutable. Use an explicit review or rework workflow where supported.</Card>)}
+      {tab === 'readiness' && <>
+        {writable && <InstallationReadinessForm {...context} />}
+        {writable && [
+          'PLANNED', 'SITE_READY', 'ON_HOLD'
+        ].includes(job.status) && <InstallationReceiptForm {...context} />}
+        <InstallationCollection key={'readiness' + job.version} id={job.id} kind="readiness" />
+        <InstallationCollection key={'receipts' + job.version} id={job.id} kind="receipts" />
+      </>}
+      {tab === 'equipment' && <>
+        {(job.equipment ?? []).map(e => <Card key={e.id}>
+          <h2 className="font-semibold">
+            {equipmentLabel(e)}
+          </h2>
+          <p className="text-sm">Dispatched {e.dispatchedQuantity} {e.unit}; usable at site {e.receivedQuantity}; damaged {e.damagedQuantity}; installed {e.installedQuantity}.</p>
+          <p>Installed position: {e.installedLocation || 'Not recorded'}
+          </p>
+          <ul className="mt-2 text-sm">
+            {e.serials.map(s => <li key={s.id}>
+              {s.serialUnit.serialNumber}: {s.installedAt ? 'Installed ' + date(s.installedAt) : s.received ? 'Verified Usable' : s.damaged ? 'Damaged' : 'Not Verified'}
+            </li>)}
+          </ul>
+        </Card>)}
+        {writable && [
+          'IN_PROGRESS', 'REWORK_REQUIRED'
+        ].includes(job.status) && (job.equipment ?? []).map(e => <InstallationEquipmentForm key={e.id} {...context} equipment={e} />)}
+      </>}
+      {tab === 'milestones' && <>
+        {(job.milestones ?? []).map(m => writable ? <InstallationMilestoneForm key={m.id} {...context} milestone={m} admin={admin} /> : <Card key={m.id}>
+          <h2 className="font-semibold">
+            {title(m.type)}: {title(m.status)}
+          </h2>
+          <p>
+            {m.completionNotes || 'No completion notes.'}
+          </p>
+          <p className="text-sm">
+            {m.required ? 'Required' : 'Optional'}; completed {date(m.actualEndAt)}
+          </p>
+        </Card>)}
+      </>}
+      {tab === 'issues' && <>
+        {writable && <InstallationIssueForm {...context} />}
+        <InstallationCollection key={job.version} id={job.id} kind="issues" context={context} admin={admin} writable={writable} />
+      </>}
+      {tab === 'evidence' && <>
+        {writable && <InstallationEvidenceForm job={job} onSaved={refresh} />}
+        <Card>
+          <h2 className="font-semibold">Private Installation Evidence</h2>
+          {!files.length ? <p>No evidence uploaded.</p> : <ul className="divide-y">
+            {files.map(f => <li key={f.id} className="py-3 space-y-1">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span>
+                  {f.fileName} ({title(f.category)})</span>
+                <Button size="sm" variant="outline" onClick={async () => {
+                  setDownloadError('');
+                  try {
+                    await installationClient.download(job.id, f);
+                  }
+                  catch (e) {
+                    setDownloadError(e instanceof Error ? e.message : 'Download failed.');
+                  }
+                }}>Download {f.fileName}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 break-all">
+                {f.sizeBytes} bytes; recorded {date(f.createdAt)}; SHA-256 {f.sha256}
+              </p>
+            </li>)}
+          </ul>}
+          {downloadError && <p role="alert">
+            {downloadError}
+          </p>}
+        </Card>
+      </>}
+      {tab === 'tests' && <>
+        <Card>
+          <h2 className="font-semibold">Internal Testing</h2>
+          <p className="text-sm">Record actual observations against the design or manufacturer basis. These records do not constitute external electrical certification.</p>
+        </Card>
+        {writable && job.status === 'TESTING' && job.testRequirements.map(r => <InstallationTestForm key={r.type} {...context} requirement={r} admin={admin} />)}
+        <InstallationCollection key={job.version} id={job.id} kind="tests" />
+      </>}
+      {tab === 'completion' && <>
+        <Card>
+          <h2 className="font-semibold">Completion Notes</h2>
+          <p className="whitespace-pre-wrap">
+            {job.completionNotes || 'No completion notes recorded.'}
+          </p>
+        </Card>
+        {job.status === 'COMMISSIONING_REVIEW' && admin && <InstallationReviewForm job={job} onSaved={refresh} />}
+        {handoff ? <Card>
+          <h2 className="font-semibold">Approved Internal Commissioning Handoff</h2>
+          <p>Review: {handoff.commissioningReviewId}
+          </p>
+          <p>Physical receipt: {date(handoff.deliveryConfirmedAt)}
+          </p>
+          <p>Internal commissioning: {date(handoff.commissioningDate)}
+          </p>
+          <p>Dispatch: {handoff.dispatchReference}
+          </p>
+          <p>Installed equipment lines: {handoff.equipment.length}; recorded test types: {handoff.testSummary.length}
+          </p>
+          <p className="text-sm text-amber-800 mt-2">External grid authorization is not recorded. Warranty start is determined separately by the warranty workflow.</p>
+          <ul>
+            {handoff.outstandingNonblockingIssues.map(i => <li key={i.id}>
+              {i.description}
+            </li>)}
+          </ul>
+        </Card> : <Card>No approved commissioning handoff is available yet.</Card>}
+      </>}
+      {tab === 'history' && <InstallationCollection id={job.id} kind="history" />}
+    </div>
+  </div>;
 }
-
+function InstallationCollection({ id, kind, context, admin = false, writable = false }: {
+  id: string;
+  kind: 'issues' | 'tests' | 'history' | 'readiness' | 'receipts';
+  context?: {
+    job: InstallationJob;
+    files: InstallationAttachment[];
+    onSaved: () => Promise<void>;
+  };
+  admin?: boolean;
+  writable?: boolean;
+}) {
+  const [page, setPage] = useState(1), [rows, setRows] = useState<(InstallationIssue | InstallationTest | InstallationHistory | AuditRecord)[]>([]), [total, setTotal] = useState(0), [error, setError] = useState(''), [loading, setLoading] = useState(true), [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    setError('');
+    installationClient.collection<InstallationIssue | InstallationTest | InstallationHistory | AuditRecord>(id, kind, page).then(r => {
+      if (live) {
+        setRows(r.data);
+        setTotal(r.total);
+      }
+    }).catch(e => {
+      if (live)
+        setError(e.message);
+    }).finally(() => {
+      if (live)
+        setLoading(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [
+    id, kind, page, retry
+  ]);
+  return <Card>
+    <h2 className="font-semibold text-lg mb-3">Recorded {title(kind)}
+    </h2>
+    {error ? <>
+      <p role="alert" className="text-red-700">
+        {error}
+      </p>
+      <Button onClick={() => setRetry(v => v + 1)}>Retry</Button>
+    </> : loading ? <p>Loading records...</p> : !rows.length ? <p>No records yet.</p> : <div className="space-y-4">
+      {rows.map(row => <div className="border rounded-lg p-3 space-y-2" key={row.id}>
+        {'severity' in row ? <>
+          <p className="font-medium">
+            {title(row.type)} | {row.severity} | {row.status}
+            {row.blocking ? ' | Blocking' : ''}
+          </p>
+          <p>
+            {row.description}
+          </p>
+          {row.resolution && <p>Resolution: {row.resolution}
+          </p>}
+          <p className="text-xs">Reported {date(row.reportedAt)}
+          </p>
+          {context && writable && (admin || (!row.blocking && ![
+            'HIGH', 'CRITICAL'
+          ].includes(row.severity))) && <InstallationIssueResolution {...context} issue={row} />}
+        </> : 'result' in row ? <>
+          <p className="font-medium">
+            {title(row.type)}: {row.result}
+            {!row.applicable ? ' (Not Applicable)' : ''}
+          </p>
+          <p>
+            {row.observations}
+          </p>
+          {row.measurement !== null && <p>Measurement: {row.measurement} {row.unit}
+          </p>}
+          <p className="text-sm">Basis: {row.requirementsBasis}; execution revision {row.executionRevision}
+          </p>
+        </> : 'event' in row ? <>
+          <p className="font-medium">
+            {title(row.event)}: {row.fromStatus ?? 'New'} to {row.toStatus}
+          </p>
+          <p>
+            {row.reason}
+          </p>
+          <p className="text-xs">Actor {row.actorId}; job version {row.jobVersion}; {date(row.createdAt)}
+          </p>
+        </> : <>
+          <p className="font-medium">Version {row.jobVersion} | {date(row.receivedAt ?? row.createdAt)}
+          </p>
+          <p>
+            {row.notes}
+          </p>
+          {row.checklist && <ul className="text-sm">
+            {Object.entries(row.checklist).map(([key, value]) => <li key={key}>
+              {title(key)}: {value ? 'Confirmed' : 'Not Confirmed'}
+            </li>)}
+          </ul>}
+          {row.conditionalWorkResolution && <p>Conditions: {row.conditionalWorkResolution}
+          </p>}
+          {row.outstandingIssues && <p className="text-amber-800">Outstanding: {row.outstandingIssues}
+          </p>}
+          {row.snapshot && <ul className="text-sm">
+            {row.snapshot.map(line => <li key={line.equipmentId}>Equipment {line.equipmentId}: usable {line.receivedQuantity}; damaged {line.damagedQuantity}; verified usable serials {line.receivedSerialIds.length}; damaged serials {line.damagedSerialIds.length}
+            </li>)}
+          </ul>}
+        </>}
+      </div>)}
+    </div>}
+    <div className="flex items-center gap-3 mt-4">
+      <Button size="sm" variant="outline" disabled={loading || page <= 1} onClick={() => setPage(v => v - 1)}>Previous Records</Button>
+      <span className="text-sm">Page {page} of {Math.max(1, Math.ceil(total / 20))}
+      </span>
+      <Button size="sm" variant="outline" disabled={loading || page * 20 >= total} onClick={() => setPage(v => v + 1)}>Next Records</Button>
+    </div>
+  </Card>;
+}
