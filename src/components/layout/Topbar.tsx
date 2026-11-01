@@ -48,20 +48,20 @@ export function Topbar({ onMenuOpen }: TopbarProps) {
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
       {/* Left side: hamburger + page title */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <button
-          className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700
+          className="lg:hidden shrink-0 p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700
                      focus:outline-none focus:ring-2 focus:ring-green-500"
           onClick={onMenuOpen}
           aria-label="Open navigation menu"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-semibold text-slate-800">{pageTitle}</h1>
+        <h1 className="text-lg font-semibold text-slate-800 truncate">{pageTitle}</h1>
       </div>
 
       {/* Right side: user info + logout */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0 ml-2">
         {/* Role badge */}
         <span
           className={`hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleMeta.badgeColour}`}

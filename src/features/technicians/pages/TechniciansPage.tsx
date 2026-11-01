@@ -1,100 +1,82 @@
-/**
- * TechniciansPage.tsx
- * ─────────────────────────────────────────────────────────────
- * Master listing page for solar technicians and field crew members.
- */
-
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HardHat, Users, Calendar, LayoutDashboard } from 'lucide-react';
-import type { Technician } from '../types/technician.types';
-import type { TechnicianTeam } from '../types/team.types';
-import { technicianService } from '../services/technicianService';
-import { teamService } from '../services/teamService';
-import { TechnicianTable } from '../components/TechnicianTable';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
-
+import { Card } from '../../../components/ui/Card';
+import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { workforceClient, type WorkforceUser } from '../services/workforceClient';
 export function TechniciansPage() {
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [teams, setTeams] = useState<TechnicianTeam[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const { user } = useAuth(), [q, setQ] = useState(''), [page, setPage] = useState(1), [rows, setRows] = useState<WorkforceUser[]>([]), [total, setTotal] = useState(0), [loading, setLoading] = useState(true), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   useEffect(() => {
-    async function loadData() {
-      try {
-        setIsLoading(true);
-        const [techData, teamData] = await Promise.all([
-          technicianService.list(),
-          teamService.list(),
-        ]);
-        setTechnicians(techData);
-        setTeams(teamData);
-      } catch (err) {
-        console.error('Failed to load technicians', err);
-      } finally {
-        setIsLoading(false);
+    let live = true;
+    setLoading(true);
+    setError('');
+    workforceClient.list({
+      q: q || undefined, page, pageSize: 20
+    }).then(r => {
+      if (live) {
+        setRows(r.data);
+        setTotal(r.total);
       }
+    }).catch(e => {
+      if (live)
+        setError(e.message);
+    }).finally(() => {
+      if (live)
+        setLoading(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [
+    q, page, retry
+  ]);
+  const columns: Column<WorkforceUser>[] = [
+    {
+      key: 'name', header: 'Technician', render: r => <Link className="text-green-700 font-semibold" to={'/technicians/' + r.id}>
+        {r.name}
+      </Link>
+    }, {
+      key: 'employmentStatus', header: 'Employment', render: r => r.technicianProfile?.employmentStatus ?? 'Profile Not Created'
+    }, {
+      key: 'isActive', header: 'Account', render: r => r.isActive ? 'Active' : 'Inactive'
+    }, {
+      key: 'baseLocation', header: 'Base Location', render: r => r.technicianProfile?.baseLocation ?? 'Not Recorded'
+    }, {
+      key: 'managed', header: 'Scheduling Policy', render: r => !r.technicianProfile ? 'Profile Missing; Availability Unknown' : r.technicianProfile.enforceScheduling ? 'Managed Eligibility Required' : 'Legacy Assignment Checks'
     }
-    loadData();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <HardHat className="w-6 h-6 text-green-600" />
-            <span>Technicians & Field Engineers</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Maintain technician profiles, skills, qualifications, employment records, and regional crew assignments
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link to="/technicians/dashboard">
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<LayoutDashboard className="w-4 h-4" />}
-            >
-              Dashboard
-            </Button>
-          </Link>
-          <Link to="/technicians/teams">
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Users className="w-4 h-4" />}
-            >
-              Crews & Teams
-            </Button>
-          </Link>
-          <Link to="/technicians/availability">
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Calendar className="w-4 h-4" />}
-            >
-              Availability Roster
-            </Button>
-          </Link>
-        </div>
+  ];
+  return <div className="max-w-7xl mx-auto space-y-5">
+    <div className="flex flex-wrap justify-between gap-3">
+      <h1 className="text-2xl font-bold">Technician Workforce</h1>
+      <div className="flex flex-wrap gap-2">
+        <Link to="/technicians/availability">
+          <Button variant="outline">Availability</Button>
+        </Link>
+        <Link to="/technicians/assignments">
+          <Button variant="outline">Assignments</Button>
+        </Link>
+        <Link to="/technicians/teams">
+          <Button variant="outline">Teams</Button>
+        </Link>
+        {user?.role === 'admin' && <Link to="/technicians/dashboard">
+          <Button variant="outline">Dashboard</Button>
+        </Link>}
       </div>
-
-      {/* Main Table */}
-      {isLoading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-xs text-slate-400">
-          Loading technician roster...
-        </div>
-      ) : (
-        <TechnicianTable
-          technicians={technicians}
-          teams={teams}
-          canManage={true}
-        />
-      )}
     </div>
-  );
+    <Card>
+      <Input label="Find Technician" value={q} onChange={e => {
+        setQ(e.target.value);
+        setPage(1);
+      }} />
+      <p className="text-sm text-slate-500 mt-3">Profiles extend existing technician accounts. Open an account to create its workforce profile. Missing calendar or qualifications never means verified availability.</p>
+    </Card>
+    {error ? <Card>
+      <p role="alert">
+        {error}
+      </p>
+      <Button onClick={() => setRetry(v => v + 1)}>Retry</Button>
+    </Card> : <DataTable columns={columns} data={rows} isLoading={loading} keyExtractor={r => r.id} page={page} pageSize={20} total={total} onPageChange={setPage} emptyMessage="No authorized technician accounts match." />}
+  </div>;
 }

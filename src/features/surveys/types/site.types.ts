@@ -9,6 +9,7 @@ export type PropertyType = 'residential' | 'commercial';
 
 export interface Site {
   id: string;
+  version?: number;
   customerId: string;
   siteName: string; // e.g. "Main Rooftop", "Warehouse Unit 2"
   addressLine1: string;
@@ -17,7 +18,7 @@ export interface Site {
   state: string;
   pinCode: string;
   country: string;
-  propertyType: PropertyType;
+  propertyType: PropertyType | null;
   contactPersonOnSite: string;
   contactPhoneOnSite: string;
   createdAt: string;
@@ -33,7 +34,7 @@ export interface SiteFormData {
   state: string;
   pinCode: string;
   country?: string;
-  propertyType: PropertyType;
+  propertyType: PropertyType | null;
   contactPersonOnSite: string;
   contactPhoneOnSite: string;
 }

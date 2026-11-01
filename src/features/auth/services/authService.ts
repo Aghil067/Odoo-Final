@@ -1,27 +1,4 @@
-/**
- * authService.ts
- * ─────────────────────────────────────────────────────────────
- * AUTH SERVICE INTERFACE
- *
- * This file defines the contract that both:
- *  - MockAuthService (development/testing)
- *  - RealAuthService (production, once backend is ready)
- * must implement.
- *
- * Switching from mock → real authentication requires:
- *  1. Create a new class implementing IAuthService
- *  2. Change the export in providers/AuthProvider.tsx
- *  3. No other file needs to change
- *
- * HOW TOKEN STORAGE WORKS (overview):
- *  Prefer HTTP-only cookies (set by the backend) – they are not
- *  accessible to JavaScript and reduce XSS risk significantly.
- *  If the backend returns tokens in JSON, store them in memory
- *  (module-level variable), NOT localStorage.
- *  This file intentionally does not commit to a storage strategy
- *  until the backend developer confirms the approach.
- */
-
+// Session authentication contract. Test doubles live only in src/tests/fixtures.
 import type {
   LoginRequest,
   LoginResponse,

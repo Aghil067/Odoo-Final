@@ -56,14 +56,14 @@ export function listLeads(user: Principal, query: z.infer<typeof v.leadQuery>) {
     const { page, pageSize, q, status, source, priority, customerId, siteId, assignedToId, followUp } = query;
     const now = new Date();
     const where: Prisma.LeadWhereInput = { AND: [leadScope(user), {
-      status, source, priority, customerId, siteId, assignedToId,
+      status, source, priority, customerId, siteId, assignedToId, preferredSystemType:query.preferredSystemType,createdAt:{gte:query.from?new Date(query.from):undefined,lte:query.to?new Date(query.to):undefined},
       ...(q ? { OR: [
-        { reference: { contains: q, mode: 'insensitive' } }, { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { reference: { contains: q, mode: 'insensitive' } }, { customer: { name: { contains: q, mode: 'insensitive' } } }, { customer: { phone: { contains: q } } },
         { site: { name: { contains: q, mode: 'insensitive' } } }, { qualificationNotes: { contains: q, mode: 'insensitive' } },
       ] } : {}),
-    }, ...(followUp ? [{ status: { in: [...openStatuses] }, nextFollowUpAt: followUp === 'overdue' ? { lt: now } : { gte: now, lte: new Date(now.getTime() + 7 * 86400_000) } }] : [])] };
+    }, ...(followUp ? [{ status: { in: [...openStatuses] }, nextFollowUpAt: followUp === 'scheduled'?{not:null}:followUp==='today'?{gte:new Date(now.toISOString().slice(0,10)+'T00:00:00Z'),lt:new Date(new Date(now.toISOString().slice(0,10)+'T00:00:00Z').getTime()+86400000)}:followUp === 'overdue' ? { lt: now } : { gte: now, lte: new Date(now.getTime() + 7 * 86400_000) } }] : [])] };
     const total = await tx.lead.count({ where });
-    const data = await tx.lead.findMany({ where, include: { assignedTo: { select: publicUser }, customer: { select: { id: true, reference: true, name: true } }, site: { select: { id: true, name: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
+    const data = await tx.lead.findMany({ where, include: { assignedTo: { select: publicUser }, customer: { select: { id: true, reference: true, name: true } }, site: { select: { id: true, name: true } } }, orderBy:followUp?[{nextFollowUpAt:'asc'},{id:'asc'}]:[{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
     return { data, pagination: pagination(page, pageSize, total) };
   });
 }
@@ -152,3 +152,5 @@ export function leadTimeline(user: Principal, id: string, query: z.infer<typeof 
     return { data, pagination: pagination(page, pageSize, total) };
   });
 }
+
+export function followUp(user:Principal,id:string,input:z.infer<typeof v.followUpCommand>){return atomic(async tx=>{const current=await requireLead(tx,user,id,true);checkVersion(current.version,input.version);requireOpen(current.status);const scheduled=input.action==='SCHEDULE'||input.action==='RESCHEDULE';if(!scheduled&&!current.nextFollowUpAt)throw new ApiError(409,'NO_FOLLOW_UP','There is no current follow-up to complete or cancel');const next=scheduled&&input.scheduledAt?new Date(input.scheduledAt):null;if(scheduled&&(!next||next<=new Date()))throw new ApiError(422,'FOLLOW_UP_DATE','Choose a real future follow-up time');const lead=await tx.lead.update({where:{id,version:input.version},data:{nextFollowUpAt:next,version:{increment:1}}});const activity=await tx.leadActivity.create({data:{leadId:id,actorId:user.id,type:'FOLLOW_UP',description:`${input.action}: ${input.notes}${next?' | '+next.toISOString():''}`}});return {lead,activity,scheduledFor:next??current.nextFollowUpAt};});}

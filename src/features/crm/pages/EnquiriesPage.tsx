@@ -9,6 +9,7 @@ import { DataTable, type Column } from '../../../components/ui/DataTable';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
+import {Card} from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { PermissionGuard } from '../../../components/common/PermissionGuard';
 import { enquiryService } from '../services/enquiryService';
@@ -19,6 +20,7 @@ import type {
 } from '../types/enquiry.types';
 import {
   ENQUIRY_STATUS_LABELS,
+  CRM_ENQUIRY_STATUSES,
   ENQUIRY_STATUS_COLOURS,
   SYSTEM_TYPE_LABELS,
   CAPACITY_LABELS,
@@ -30,6 +32,7 @@ export function EnquiriesPage() {
   const [enquiries, setEnquiries] = useState<EnquirySummary[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState(''),[retry,setRetry]=useState(0);
 
   // Filter state
   const [search, setSearch] = useState('');
@@ -41,7 +44,7 @@ export function EnquiriesPage() {
   useEffect(() => {
     async function loadEnquiries() {
       try {
-        setIsLoading(true);
+        setIsLoading(true);setError('');
         const res = await enquiryService.list({
           search,
           status,
@@ -52,13 +55,13 @@ export function EnquiriesPage() {
         setEnquiries(res.data);
         setTotal(res.total);
       } catch (err) {
-        console.error('Failed to load enquiries', err);
+        setError(err instanceof Error?err.message:'The requested records are unavailable.');
       } finally {
         setIsLoading(false);
       }
     }
     loadEnquiries();
-  }, [search, status, systemType, page]);
+  }, [search, status, systemType, page,retry]);
 
   const columns: Column<EnquirySummary>[] = [
     {
@@ -173,7 +176,7 @@ export function EnquiriesPage() {
         <Select
           options={[
             { value: '', label: 'All Statuses' },
-            ...Object.entries(ENQUIRY_STATUS_LABELS).map(([k, v]) => ({ value: k, label: v })),
+            ...Object.entries(ENQUIRY_STATUS_LABELS).filter(([k])=>CRM_ENQUIRY_STATUSES.includes(k as EnquiryStatus)).map(([k, v]) => ({ value: k, label: v })),
           ]}
           value={status}
           onChange={(e) => {
@@ -195,7 +198,7 @@ export function EnquiriesPage() {
       </div>
 
       {/* Main Table */}
-      <DataTable
+      {error?<Card><p role="alert" className="text-red-700">{error}</p><Button onClick={()=>setRetry(v=>v+1)}>Retry Records</Button></Card>:<DataTable
         columns={columns}
         data={enquiries}
         isLoading={isLoading}
@@ -205,7 +208,7 @@ export function EnquiriesPage() {
         total={total}
         onPageChange={setPage}
         emptyMessage="No solar enquiries matched your criteria."
-      />
+      />}
     </div>
   );
 }

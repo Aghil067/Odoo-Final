@@ -10,6 +10,7 @@ import type { PropertyType } from './site.types';
 // ─── Survey Statuses ──────────────────────────────────────────
 
 export type SurveyStatus =
+  | 'requested'
   | 'draft'
   | 'scheduled'
   | 'assigned'
@@ -20,9 +21,9 @@ export type SurveyStatus =
   | 'reinspection_required'
   | 'cancelled';
 
-export type ApprovalStatus = 'pending_approval' | 'approved' | 'rejected';
+export type ApprovalStatus = 'not_submitted' | 'pending_approval' | 'approved' | 'rejected';
 
-export type SurveyPriority = 'low' | 'medium' | 'high';
+export type SurveyPriority = 'low' | 'medium' | 'high' | 'unspecified';
 
 // ─── Technical Survey Execution Types ─────────────────────────
 
@@ -142,7 +143,7 @@ export interface Survey {
   siteId: string;
   siteName: string;
   siteLocation: string; // City or summary address
-  propertyType: PropertyType;
+  propertyType: PropertyType | null;
 
   // Scheduling
   scheduledDate: string;
@@ -185,7 +186,7 @@ export interface CreateSurveyRequestData {
   siteId: string;
   siteName: string;
   siteLocation: string;
-  propertyType: PropertyType;
+  propertyType: PropertyType | null;
   scheduledDate: string;
   preferredTime: string;
   assignedSurveyorId: string;
@@ -210,6 +211,7 @@ export interface SurveyExecutionData {
 }
 
 export interface SurveyFilters {
+  customerId?: string;
   search?: string;
   status?: SurveyStatus | '';
   approvalStatus?: ApprovalStatus | '';
@@ -224,6 +226,7 @@ export interface SurveyFilters {
 // ─── Display Helper Labels & Badges ───────────────────────────
 
 export const SURVEY_STATUS_LABELS: Record<SurveyStatus, string> = {
+  requested: 'Requested',
   draft: 'Draft',
   scheduled: 'Scheduled',
   assigned: 'Assigned',
@@ -236,6 +239,7 @@ export const SURVEY_STATUS_LABELS: Record<SurveyStatus, string> = {
 };
 
 export const SURVEY_STATUS_COLOURS: Record<SurveyStatus, string> = {
+  requested: 'bg-slate-100 text-slate-700',
   draft: 'bg-slate-100 text-slate-700',
   scheduled: 'bg-blue-100 text-blue-800',
   assigned: 'bg-indigo-100 text-indigo-800',
@@ -248,12 +252,14 @@ export const SURVEY_STATUS_COLOURS: Record<SurveyStatus, string> = {
 };
 
 export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
+  not_submitted: 'Not Submitted for Review',
   pending_approval: 'Pending Approval',
   approved: 'Approved',
   rejected: 'Rejected',
 };
 
 export const APPROVAL_STATUS_COLOURS: Record<ApprovalStatus, string> = {
+  not_submitted: 'bg-slate-100 text-slate-700',
   pending_approval: 'bg-amber-100 text-amber-800',
   approved: 'bg-emerald-100 text-emerald-800',
   rejected: 'bg-red-100 text-red-800',

@@ -1,6 +1,7 @@
 /**
  * src/components/ui/Textarea.tsx
  */
+import {useId} from 'react';
 import type { TextareaHTMLAttributes } from 'react';
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -10,7 +11,8 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 export function Textarea({ label, error, required, id, className = '', ...props }: TextareaProps) {
-  const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
+  const generatedId=useId();
+  const inputId = id ?? generatedId;
   return (
     <div className="flex flex-col gap-1">
       {label && (
@@ -20,6 +22,7 @@ export function Textarea({ label, error, required, id, className = '', ...props 
       )}
       <textarea
         id={inputId}
+        required={required}
         rows={3}
         className={`
           w-full px-3 py-2 text-sm rounded-lg border bg-white text-slate-800

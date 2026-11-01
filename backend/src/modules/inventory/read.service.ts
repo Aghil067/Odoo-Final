@@ -29,7 +29,7 @@ export function balances(user:Principal,q:Query) {
 export function movements(user:Principal,q:Query) {
   reader(user); return inventoryAtomic(async tx=>{
     const where:Prisma.StockMovementWhereInput={type:q.type,operationId:q.operationId,balance:{warehouseId:q.warehouseId,componentId:q.componentId},createdAt:{gte:q.from?new Date(q.from):undefined,lte:q.to?new Date(q.to):undefined}};
-    return {data:await tx.stockMovement.findMany({where,...paging(q),include:{balance:{select:{warehouseId:true,componentId:true}},operation:{select:{id:true,kind:true,reference:true,actorId:true,reason:true,createdAt:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockMovement.count({where}))};
+    return {data:await tx.stockMovement.findMany({where,...paging(q),include:{balance:{select:{warehouseId:true,componentId:true,component:{select:{name:true,sku:true,unit:true}},warehouse:{select:{name:true,code:true}}}},operation:{select:{id:true,kind:true,reference:true,actorId:true,actor:{select:{id:true,name:true}},reason:true,createdAt:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockMovement.count({where}))};
   });
 }
 export function serials(user:Principal,q:Query) {
@@ -39,21 +39,21 @@ export function serials(user:Principal,q:Query) {
   });
 }
 export function serialDetail(user:Principal,id:string) { reader(user);return inventoryAtomic(tx=>tx.inventorySerialUnit.findUniqueOrThrow({where:{id},include:{component:{select:{id:true,sku:true,name:true}},receiptOperation:{select:{id:true,reference:true,createdAt:true}},warehouse:true}})); }
-export function serialHistory(user:Principal,id:string,q:Query) { reader(user);return inventoryAtomic(async tx=>{await tx.inventorySerialUnit.findUniqueOrThrow({where:{id}});const where={serialUnitId:id};return {data:await tx.inventorySerialEvent.findMany({where,...paging(q),orderBy:{version:'desc'}}),pagination:pagination(q.page,q.pageSize,await tx.inventorySerialEvent.count({where}))};}); }
+export function serialHistory(user:Principal,id:string,q:Query) { reader(user);return inventoryAtomic(async tx=>{await tx.inventorySerialUnit.findUniqueOrThrow({where:{id}});const where={serialUnitId:id};return {data:await tx.inventorySerialEvent.findMany({where,...paging(q),include:{operation:{select:{id:true,reference:true,kind:true,actor:{select:{id:true,name:true}}}}},orderBy:{version:'desc'}}),pagination:pagination(q.page,q.pageSize,await tx.inventorySerialEvent.count({where}))};}); }
 export function reservations(user:Principal,q:Query) {return inventoryAtomic(async tx=>{
-  const where:Prisma.StockReservationWhereInput={warehouseId:q.warehouseId,configurationId:q.configurationId,status:q.status,configuration:configurationScope(user)};
-  return {data:await tx.stockReservation.findMany({where,select:reservationSelect,...paging(q),orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockReservation.count({where}))};
+  const where:Prisma.StockReservationWhereInput={warehouseId:q.warehouseId,configurationId:q.configurationId,status:q.status,configuration:configurationScope(user),...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
+  return {data:await tx.stockReservation.findMany({where,select:{...reservationSelect,warehouse:{select:{id:true,name:true,code:true}},configuration:{select:{id:true,name:true,reference:true,customer:{select:{name:true}},site:{select:{name:true}}}}},...paging(q),orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockReservation.count({where}))};
 });}
 export function reservationDetail(user:Principal,id:string) {return inventoryAtomic(async tx=>{
-  const row=await tx.stockReservation.findFirst({where:{id,configuration:configurationScope(user)},select:{...reservationSelect,lines:{include:{serials:{select:{id:true,serialNumber:true,state:true}},dispatchLine:true}},dispatch:{select:{id:true,reference:true,status:true,dispatchedAt:true}}}});
+  const row=await tx.stockReservation.findFirst({where:{id,configuration:configurationScope(user)},select:{...reservationSelect,warehouse:{select:{id:true,name:true,code:true}},configuration:{select:{id:true,name:true,reference:true,customer:{select:{name:true}},site:{select:{name:true}}}},lines:{include:{bomLine:{select:{unit:true,skuSnapshot:true,descriptionSnapshot:true}},serials:{select:{id:true,serialNumber:true,state:true}},dispatchLine:true}},dispatch:{select:{id:true,reference:true,status:true,dispatchedAt:true}}}});
   if(!row) throw new ApiError(404,'NOT_FOUND','Reservation not found');return row;
 });}
 export function dispatches(user:Principal,q:Query) {return inventoryAtomic(async tx=>{
-  const where:Prisma.StockDispatchWhereInput={warehouseId:q.warehouseId,reservation:{configurationId:q.configurationId,configuration:configurationScope(user)}};
-  return {data:await tx.stockDispatch.findMany({where,...paging(q),orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockDispatch.count({where}))};
+  const where:Prisma.StockDispatchWhereInput={warehouseId:q.warehouseId,reservation:{configurationId:q.configurationId,configuration:configurationScope(user)},...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
+  return {data:await tx.stockDispatch.findMany({where,...paging(q),include:{warehouse:{select:{id:true,name:true,code:true}},reservation:{select:{configuration:{select:{id:true,name:true,customer:{select:{name:true}},site:{select:{name:true}}}}}}},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.stockDispatch.count({where}))};
 });}
 export function dispatchDetail(user:Principal,id:string) {return inventoryAtomic(async tx=>{
-  const row=await tx.stockDispatch.findFirst({where:{id,reservation:{configuration:configurationScope(user)}},include:{reservation:{select:{...reservationSelect,configuration:{select:{customerId:true,leadId:true,siteId:true,approvedSurveyId:true,approvedSurveyVersion:true,surveyReviewId:true}}}},lines:{include:{reservationLine:{select:{componentId:true,bomLineId:true,bomLine:{select:{unit:true,skuSnapshot:true,descriptionSnapshot:true}}}},serials:{select:{id:true,serialNumber:true,state:true}}}}}});
+  const row=await tx.stockDispatch.findFirst({where:{id,reservation:{configuration:configurationScope(user)}},include:{warehouse:{select:{id:true,name:true,code:true}},reservation:{select:{...reservationSelect,configuration:{select:{id:true,name:true,reference:true,customer:{select:{name:true}},site:{select:{name:true}},customerId:true,leadId:true,siteId:true,approvedSurveyId:true,approvedSurveyVersion:true,surveyReviewId:true}}}},lines:{include:{reservationLine:{select:{componentId:true,bomLineId:true,bomLine:{select:{unit:true,skuSnapshot:true,descriptionSnapshot:true}}}},serials:{select:{id:true,serialNumber:true,state:true}}}}}});
   if(!row) throw new ApiError(404,'NOT_FOUND','Dispatch not found');
   const historicalSerials=await tx.inventorySerialUnit.findMany({where:{id:{in:row.lines.flatMap(l=>l.serialUnitIds)}},select:{id:true,serialNumber:true,componentId:true,state:true,warehouseId:true,receivedAt:true,receiptOperationId:true}});
   return {...row,lines:row.lines.map(l=>({...l,serials:historicalSerials.filter(s=>l.serialUnitIds.includes(s.id))})),scope:'WAREHOUSE_RELEASE_NOT_INSTALLATION_OR_WARRANTY'};
@@ -80,7 +80,18 @@ export function summary(user:Principal,q:Query) {
   });
 }
 export function operations(user:Principal,q:Query) { reader(user);return inventoryAtomic(async tx=>{
- const where:Prisma.InventoryOperationWhereInput={...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
+ const where:Prisma.InventoryOperationWhereInput={kind:q.kind,...(q.q?{reference:{contains:q.q,mode:'insensitive'}}:{})};
  return {data:await tx.inventoryOperation.findMany({where,...paging(q),select:{id:true,kind:true,reference:true,actorId:true,reason:true,createdAt:true},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.inventoryOperation.count({where}))};
 });}
-export function operationDetail(user:Principal,id:string) {reader(user);return inventoryAtomic(tx=>tx.inventoryOperation.findUniqueOrThrow({where:{id},select:{id:true,kind:true,reference:true,actorId:true,reason:true,payload:true,result:true,createdAt:true}}));}
+export function operationDetail(user:Principal,id:string) {reader(user);return inventoryAtomic(tx=>tx.inventoryOperation.findUniqueOrThrow({where:{id},select:{id:true,kind:true,reference:true,actorId:true,actor:{select:{id:true,name:true}},reason:true,payload:true,result:true,createdAt:true,movements:{include:{balance:{select:{component:{select:{name:true,sku:true,unit:true}},warehouse:{select:{name:true,code:true}}}}},orderBy:[{createdAt:'asc'},{id:'asc'}]},serialEvents:{select:{id:true,fromState:true,toState:true,version:true,serialUnit:{select:{id:true,serialNumber:true,componentId:true}}},orderBy:{version:'asc'}}}}));}
+
+const componentLookupSelect={id:true,sku:true,name:true,category:true,unit:true,serializationRequired:true,isActive:true,version:true,manufacturer:true,modelNumber:true} as const;
+export function components(user:Principal,q:Query){reader(user);return inventoryAtomic(async tx=>{
+ const where:Prisma.SolarComponentWhereInput={category:q.category,...(q.active?{isActive:q.active==='true'}:{}),...(q.q?{OR:[{sku:{contains:q.q,mode:'insensitive'}},{name:{contains:q.q,mode:'insensitive'}}]}:{})};
+ return {data:await tx.solarComponent.findMany({where,select:componentLookupSelect,...paging(q),orderBy:[{name:'asc'},{id:'asc'}]}),pagination:pagination(q.page,q.pageSize,await tx.solarComponent.count({where}))};
+});}
+export function componentDetail(user:Principal,id:string){reader(user);return inventoryAtomic(async tx=>{const row=await tx.solarComponent.findUnique({where:{id},select:componentLookupSelect});if(!row)throw new ApiError(404,'NOT_FOUND','Component not found');return row;});}
+export function fulfillmentConfigurations(user:Principal,q:Query){return inventoryAtomic(async tx=>{
+ const where:Prisma.SolarConfigurationWhereInput={AND:[configurationScope(user),{status:'APPROVED',nextRevision:null,...(q.q?{OR:[{reference:{contains:q.q,mode:'insensitive'}},{name:{contains:q.q,mode:'insensitive'}}]}:{})}]};
+ return {data:await tx.solarConfiguration.findMany({where,...paging(q),select:{id:true,reference:true,name:true,approvedVersion:true,customer:{select:{id:true,name:true}},site:{select:{id:true,name:true}}},orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(q.page,q.pageSize,await tx.solarConfiguration.count({where}))};
+});}

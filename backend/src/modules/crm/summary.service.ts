@@ -23,11 +23,13 @@ export function crmSummary(user: Principal) {
     return {
       asOf: now, upcomingUntil,
       totalCustomers: await tx.customer.count({ where: { AND: [customerScope(user), { isArchived: false }] } }),
+      acceptedOrders:await tx.financeSalesOrder.count({where:{quotation:{lead:scope}}}),
       totalLeads, newLeads: count('NEW'), qualifiedLeads: count('QUALIFIED'), surveyRequests: count('SURVEY_REQUESTED'), lostLeads: count('LOST'),
       leadsByStatus: byStatus.map(group => ({ status: group.status, count: group._count._all })),
       leadsBySource: bySource.map(group => ({ source: group.source, count: group._count._all })),
       upcomingFollowUps: { total: await tx.lead.count({ where: upcomingWhere }), items: await tx.lead.findMany({ where: upcomingWhere, select, orderBy, take: 10 }) },
       overdueFollowUps: { total: await tx.lead.count({ where: overdueWhere }), items: await tx.lead.findMany({ where: overdueWhere, select, orderBy, take: 10 }) },
+      scheduledFollowUps:await tx.lead.count({where:{AND:[scope,{status:{in:[...openStatuses]},nextFollowUpAt:{not:null}}]}}),
       qualifiedEver,
       qualificationConversionRate: totalLeads ? Math.round(qualifiedEver / totalLeads * 10000) / 100 : 0,
     };

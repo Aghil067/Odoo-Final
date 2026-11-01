@@ -1,110 +1,15 @@
-/**
- * customerService.ts
- * ─────────────────────────────────────────────────────────────
- * Customer API service.
- * Currently backed by mock data. Swap to apiClient when backend is ready.
- *
- * HOW TO SWITCH TO REAL API:
- *  Replace the mock implementations with apiClient.get/post/put calls.
- *  The service interface and return shapes stay the same — no UI changes needed.
- */
-
-import type {
-  Customer, CustomerSummary, CustomerFormData,
-  CustomerFilters, CustomerActivity,
-} from '../types/customer.types';
-import { MOCK_CUSTOMERS, getMockCustomerActivity } from '../data/mockData';
-
-function delay(ms = 400): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-let _store = [...MOCK_CUSTOMERS]; // mutable in-memory store
-let _nextId = _store.length + 1;
-
-function toSummary(c: Customer): CustomerSummary {
-  return {
-    id: c.id, customerId: c.customerId, fullName: c.fullName, phone: c.phone,
-    email: c.email, customerType: c.customerType, city: c.city,
-    numberOfSites: c.numberOfSites, status: c.status, createdAt: c.createdAt,
-  };
-}
-
-export const customerService = {
-  /** GET /api/customers */
-  async list(filters: CustomerFilters = {}): Promise<{ data: CustomerSummary[]; total: number }> {
-    await delay();
-    let results = _store.map(toSummary);
-
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      results = results.filter(
-        (c) => c.fullName.toLowerCase().includes(q) || c.phone.includes(q) || (c.email ?? '').toLowerCase().includes(q)
-      );
-    }
-    if (filters.customerType) results = results.filter((c) => c.customerType === filters.customerType);
-    if (filters.city) results = results.filter((c) => (c.city ?? '').toLowerCase().includes(filters.city!.toLowerCase()));
-    if (filters.status) results = results.filter((c) => c.status === filters.status);
-
-    const sortBy = (filters.sortBy as keyof CustomerSummary) ?? 'createdAt';
-    const sortOrder = filters.sortOrder ?? 'desc';
-    results.sort((a, b) => {
-      const va = String(a[sortBy] ?? '');
-      const vb = String(b[sortBy] ?? '');
-      return sortOrder === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-    });
-
-    const total = results.length;
-    const page = filters.page ?? 1;
-    const pageSize = filters.pageSize ?? 10;
-    const start = (page - 1) * pageSize;
-    return { data: results.slice(start, start + pageSize), total };
-  },
-
-  /** GET /api/customers/:id */
-  async getById(id: string): Promise<Customer | null> {
-    await delay();
-    return _store.find((c) => c.id === id) ?? null;
-  },
-
-  /** POST /api/customers */
-  async create(data: CustomerFormData): Promise<Customer> {
-    await delay(600);
-    const id = `cust-${String(_nextId).padStart(3, '0')}`;
-    const customerId = `CUST-${String(_nextId).padStart(4, '0')}`;
-    _nextId++;
-    const now = new Date().toISOString();
-    const customer: Customer = {
-      ...data,
-      id, customerId,
-      status: data.status ?? 'prospect',
-      numberOfSites: 0,
-      createdAt: now, updatedAt: now,
-    };
-    _store = [..._store, customer];
-    return customer;
-  },
-
-  /** PUT /api/customers/:id */
-  async update(id: string, data: Partial<CustomerFormData>): Promise<Customer> {
-    await delay(600);
-    const idx = _store.findIndex((c) => c.id === id);
-    if (idx === -1) throw new Error('Customer not found.');
-    const updated: Customer = { ..._store[idx], ...data, updatedAt: new Date().toISOString() };
-    _store = [..._store.slice(0, idx), updated, ..._store.slice(idx + 1)];
-    return updated;
-  },
-
-  /** GET /api/customers/:id/activity */
-  async getActivity(customerId: string): Promise<CustomerActivity[]> {
-    await delay(300);
-    return getMockCustomerActivity(customerId);
-  },
-
-  /** Utility: get all cities for filter dropdown */
-  async getCities(): Promise<string[]> {
-    await delay(200);
-    return [...new Set(_store.map((c) => c.city).filter(Boolean) as string[])].sort();
-  },
+import {getData,getPage,postData,patchData,unsupported} from '../../../services/apiClient';
+import type {Customer,CustomerFormData,CustomerFilters,CustomerActivity} from '../types/customer.types';
+export interface CustomerRecord {id:string;reference:string;name:string;type:'INDIVIDUAL'|'BUSINESS';companyName:string|null;phone:string;email:string|null;notes:string|null;isArchived:boolean;version:number;createdAt:string;updatedAt:string;_count?:{sites:number};sitesPagination?:{totalItems:number}}
+export function mapCustomer(r:CustomerRecord):Customer{return {id:r.id,customerId:r.reference,fullName:r.companyName??r.name,contactPerson:r.companyName?r.name:undefined,customerType:r.type==='BUSINESS'?'business':'individual',phone:r.phone,email:r.email??undefined,notes:r.notes??undefined,status:r.isArchived?'inactive':'active',numberOfSites:r.sitesPagination?.totalItems??r._count?.sites??null,createdAt:r.createdAt,updatedAt:r.updatedAt,version:r.version};}
+function body(data:CustomerFormData){return {name:data.customerType==='individual'?data.fullName:data.contactPerson||data.fullName,type:data.customerType==='individual'?'INDIVIDUAL':'BUSINESS',companyName:data.customerType==='individual'?null:data.fullName,phone:data.phone,email:data.email?.trim()||null,notes:data.notes?.trim()||null};}
+export const customerService={
+ async list(filters:CustomerFilters={}){if(filters.status==='prospect')unsupported('Prospect customer status');const result=await getPage<CustomerRecord>('/customers',{q:filters.search||undefined,type:filters.customerType?filters.customerType==='individual'?'INDIVIDUAL':'BUSINESS':undefined,archived:filters.status==='inactive'?'true':'false',city:filters.city||undefined,page:filters.page??1,pageSize:filters.pageSize??10});return {data:result.data.map(mapCustomer),total:result.total};},
+ async getById(id:string){return mapCustomer(await getData<CustomerRecord>(`/customers/${id}`));},
+ async create(data:CustomerFormData){const result=await postData<CustomerRecord>('/customers',body(data));return mapCustomer({...result,_count:{sites:0}});},
+ async update(id:string,data:Partial<CustomerFormData>){if(!data.version)unsupported('Editing without the loaded customer version; refresh first');return mapCustomer(await patchData<CustomerRecord>(`/customers/${id}`,{...body(data as CustomerFormData),version:data.version}));},
+ async archive(id:string,version:number){return mapCustomer(await postData<CustomerRecord>(`/customers/${id}/archive`,{version}));},
+ async getActivity(id:string):Promise<CustomerActivity[]>{const page=await getPage<{id:string;type:string;description:string;createdAt:string;actor?:{name:string}}>(`/customers/${id}/activities`);return page.data.map(r=>({id:r.id,type:'activity_recorded',description:r.description,performedBy:r.actor?.name??'Recorded actor',timestamp:r.createdAt}));},
+ async getActivityPage(id:string,page=1){const r=await getPage<{id:string;description:string;createdAt:string;actor?:{name:string}}>(`/customers/${id}/activities`,{page,pageSize:10});return {...r,data:r.data.map(row=>({id:row.id,type:'activity_recorded' as const,description:row.description,performedBy:row.actor?.name??'Actor Not Included',timestamp:row.createdAt}))};},
+ async getCities(){return getData<string[]>('/crm/cities');}
 };
-

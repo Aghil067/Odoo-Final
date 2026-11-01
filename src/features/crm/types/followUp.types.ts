@@ -3,11 +3,12 @@
  * @provisional – confirm with backend developer.
  */
 
-export type FollowUpType = 'phone_call' | 'email' | 'site_visit' | 'meeting' | 'other';
+export type FollowUpType = 'phone_call' | 'email' | 'site_visit' | 'meeting' | 'other' | 'unspecified';
 export type FollowUpStatus = 'pending' | 'completed' | 'rescheduled' | 'cancelled';
 
 export interface FollowUp {
   id: string;
+  version?:number;
   followUpId: string;           // e.g. FU-0001
   customerId: string;
   customerName: string;
@@ -26,6 +27,8 @@ export interface FollowUp {
 }
 
 export interface FollowUpFormData {
+  reschedule?:boolean;
+  version?:number;
   customerId: string;
   enquiryId?: string;
   assignedTo: string;
@@ -36,10 +39,12 @@ export interface FollowUpFormData {
 }
 
 export interface CompleteFollowUpData {
+  version?:number;
   outcomeNote: string;
 }
 
 export interface RescheduleFollowUpData {
+  version?:number;
   followUpDate: string;
   followUpTime: string;
   notes?: string;
@@ -61,6 +66,7 @@ export const FOLLOW_UP_TYPE_LABELS: Record<FollowUpType, string> = {
   site_visit: 'Site Visit',
   meeting: 'Meeting',
   other: 'Other',
+  unspecified:'Not specified',
 };
 
 export const FOLLOW_UP_STATUS_LABELS: Record<FollowUpStatus, string> = {
@@ -78,6 +84,7 @@ export const FOLLOW_UP_STATUS_COLOURS: Record<FollowUpStatus, string> = {
 };
 
 export const FOLLOW_UP_TYPE_COLOURS: Record<FollowUpType, string> = {
+  unspecified:'bg-slate-100 text-slate-700',
   phone_call: 'bg-indigo-100 text-indigo-800',
   email: 'bg-cyan-100 text-cyan-800',
   site_visit: 'bg-green-100 text-green-800',

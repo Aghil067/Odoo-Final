@@ -1,81 +1,96 @@
-/**
- * InstallationsPage.tsx
- * ─────────────────────────────────────────────────────────────
- * Master listing page for all Solar Installation Work Orders.
- */
-
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Wrench, Calendar, LayoutDashboard } from 'lucide-react';
-import type { Installation } from '../types/installation.types';
-import { installationService } from '../services/installationService';
-import { InstallationTable } from '../components/InstallationTable';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
-
+import { Input } from '../../../components/ui/Input';
+import { Select } from '../../../components/ui/Select';
+import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { installationClient, installationStates, type InstallationJob } from '../services/installationClient';
 export function InstallationsPage() {
-  const [installations, setInstallations] = useState<Installation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const { user } = useAuth(), [q, setQ] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1), [rows, setRows] = useState<InstallationJob[]>([]), [total, setTotal] = useState(0), [loading, setLoading] = useState(true), [error, setError] = useState(''), [retry, setRetry] = useState(0);
   useEffect(() => {
-    async function loadData() {
-      try {
-        setIsLoading(true);
-        const data = await installationService.list();
-        setInstallations(data);
-      } catch (err) {
-        console.error('Failed to load installations', err);
-      } finally {
-        setIsLoading(false);
+    let live = true;
+    setLoading(true);
+    setError('');
+    installationClient.list({
+      q: q || undefined, status: status || undefined, page, pageSize: 20
+    }).then(r => {
+      if (live) {
+        setRows(r.data);
+        setTotal(r.total);
       }
+    }).catch(e => {
+      if (live)
+        setError(e.message);
+    }).finally(() => {
+      if (live)
+        setLoading(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [
+    q, status, page, retry
+  ]);
+  const columns: Column<InstallationJob>[] = [
+    {
+      key: 'reference', header: 'Installation', render: r => <Link className="font-semibold text-green-700" to={'/installations/' + r.id}>
+        {r.name}
+        <span className="block text-xs text-slate-500">
+          {r.reference}
+        </span>
+      </Link>
+    }, {
+      key: 'status', header: 'Status'
+    }, {
+      key: 'plannedStartAt', header: 'Planned Start', render: r => new Date(r.plannedStartAt).toLocaleString()
+    }, {
+      key: 'plannedEndAt', header: 'Planned End', render: r => new Date(r.plannedEndAt).toLocaleString()
+    }, {
+      key: 'deliveryConfirmedAt', header: 'Site Receipt', render: r => r.deliveryConfirmedAt ? new Date(r.deliveryConfirmedAt).toLocaleString() : 'Not fully verified'
+    }, {
+      key: 'commissionedAt', header: 'Internal Commissioning', render: r => r.commissionedAt ? new Date(r.commissionedAt).toLocaleString() : 'Pending'
     }
-    loadData();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Wrench className="w-6 h-6 text-green-600" />
-            <span>Installation Work Orders</span>
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Track, schedule, and execute rooftop solar installations across residential and commercial sites
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link to="/installations/dashboard">
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<LayoutDashboard className="w-4 h-4" />}
-            >
-              Dashboard
-            </Button>
-          </Link>
-          <Link to="/installations/schedule">
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Calendar className="w-4 h-4" />}
-            >
-              Schedule
-            </Button>
-          </Link>
-        </div>
+  ];
+  return <div className="space-y-5 max-w-7xl mx-auto">
+    <div className="flex flex-wrap justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">Installation Management</h1>
+        <p className="text-sm text-slate-500">Real project execution, equipment receipt and internal commissioning.</p>
       </div>
-
-      {/* Main Table Component */}
-      {isLoading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-xs text-slate-400">
-          Loading installation work orders...
-        </div>
-      ) : (
-        <InstallationTable installations={installations} />
-      )}
+      <div className="flex gap-2">
+        <Link to="/installations/dashboard">
+          <Button variant="outline">Dashboard</Button>
+        </Link>
+        {user?.role === 'admin' && <Link to="/installations/new">
+          <Button>Plan Installation</Button>
+        </Link>}
+      </div>
     </div>
-  );
+    <Card>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Input label="Find Installation" value={q} onChange={e => {
+          setQ(e.target.value);
+          setPage(1);
+        }} />
+        <Select label="Installation Status" value={status} options={[
+          {
+            value: '', label: 'All Authorized States'
+          }, ...installationStates.map(v => ({
+            value: v, label: v.replaceAll('_', ' ')
+          }))
+        ]} onChange={e => {
+          setStatus(e.target.value);
+          setPage(1);
+        }} />
+      </div>
+    </Card>
+    {error ? <Card>
+      <p role="alert" className="text-red-700">
+        {error}
+      </p>
+      <Button onClick={() => setRetry(v => v + 1)}>Retry</Button>
+    </Card> : <DataTable columns={columns} data={rows} isLoading={loading} keyExtractor={r => r.id} page={page} pageSize={20} total={total} onPageChange={setPage} emptyMessage="No installations match these filters." />}
+  </div>;
 }
-

@@ -39,6 +39,7 @@ import type {
   PermissionLevel,
 } from '../types/auth.types';
 import { getPermission } from '../../../config/permissions';
+import {SESSION_EXPIRED} from '../../../services/apiClient';
 
 // ─── Context value type ─────────────────────────────────────────
 export interface AuthContextValue extends AuthState {
@@ -85,6 +86,7 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
     isInitialized: false, // becomes true after the initial session check
     error: null,
   });
+  useEffect(()=>{const expire=()=>setState({user:null,isLoading:false,isInitialized:true,error:'Your session expired. Sign in again.'});window.addEventListener(SESSION_EXPIRED,expire);return ()=>window.removeEventListener(SESSION_EXPIRED,expire);},[]);
 
   // ── Restore session on mount ──────────────────────────────────
   useEffect(() => {
@@ -100,10 +102,9 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
             isInitialized: true,
           }));
         }
-      } catch {
-        // No valid session – that is fine, just mark as initialized
+      } catch (error) {
         if (!cancelled) {
-          setState((prev) => ({ ...prev, isInitialized: true }));
+          setState((prev) => ({ ...prev, isInitialized: true,error:error instanceof Error?error.message:'Unable to restore the session.' }));
         }
       }
     }
@@ -146,14 +147,14 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
       await service.logout();
-    } finally {
-      // Always clear local state, even if the server call fails
       setState({
         user: null,
         isLoading: false,
         isInitialized: true,
         error: null,
       });
+    } catch(error) {
+      setState(prev=>({...prev,isLoading:false,error:error instanceof Error?error.message:'Logout failed; your server session may still be active.'}));
     }
   }, [service]);
 
@@ -182,7 +183,7 @@ export function AuthProvider({ children, service }: AuthProviderProps) {
     getModulePermission,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{state.user&&state.error&&<div role="alert" className="bg-red-50 text-red-800 p-3">{state.error}</div>}{children}</AuthContext.Provider>;
 }
 
 // ─── Internal hook (not exported from here) ───────────────────

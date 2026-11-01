@@ -3,7 +3,7 @@
  * Visual sales pipeline stage indicator and pipeline summary.
  */
 import { Check } from 'lucide-react';
-import { PIPELINE_STAGES, ENQUIRY_STATUS_LABELS, type EnquiryStatus } from '../types/enquiry.types';
+import { PIPELINE_STAGES, ENQUIRY_STATUS_LABELS, CRM_LEAD_TRANSITIONS, type EnquiryStatus } from '../types/enquiry.types';
 
 interface EnquiryPipelineProps {
   currentStatus: EnquiryStatus;
@@ -12,10 +12,10 @@ interface EnquiryPipelineProps {
 }
 
 export function EnquiryPipeline({ currentStatus, onStatusChange, disabled }: EnquiryPipelineProps) {
-  if (currentStatus === 'lost') {
+  if (currentStatus === 'lost'||currentStatus==='disqualified') {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-center justify-between">
-        <span className="font-semibold">Pipeline Status: Lost</span>
+        <span className="font-semibold">Pipeline Status: {ENQUIRY_STATUS_LABELS[currentStatus]}</span>
         {onStatusChange && !disabled && (
           <button
             onClick={() => onStatusChange('contacted')}
@@ -41,7 +41,7 @@ export function EnquiryPipeline({ currentStatus, onStatusChange, disabled }: Enq
             <div key={stage} className="flex-1 flex items-center last:flex-none">
               <button
                 type="button"
-                disabled={disabled || !onStatusChange}
+                disabled={disabled || !onStatusChange || !(CRM_LEAD_TRANSITIONS[currentStatus]??[]).includes(stage)}
                 onClick={() => onStatusChange && onStatusChange(stage)}
                 className={`flex flex-col items-center group focus:outline-none ${
                   disabled || !onStatusChange ? 'cursor-default' : 'cursor-pointer'

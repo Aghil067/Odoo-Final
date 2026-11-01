@@ -32,7 +32,7 @@ export function listCustomers(user: Principal, query: z.infer<typeof v.customerQ
     const { page, pageSize, q } = query;
     const normalized = q ? v.normalizePhone(q) : undefined;
     const where: Prisma.CustomerWhereInput = { AND: [customerScope(user), {
-      isArchived: query.archived === 'true', type: query.type,
+      isArchived: query.archived === 'true', type: query.type, ...(query.city?{sites:{some:{city:query.city}}}:{}),
       ...(q ? { OR: [
         { name: { contains: q, mode: 'insensitive' } }, { reference: { contains: q, mode: 'insensitive' } },
         { companyName: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } },
@@ -40,7 +40,7 @@ export function listCustomers(user: Principal, query: z.infer<typeof v.customerQ
       ] } : {}),
     }] };
     const total = await tx.customer.count({ where });
-    const data = await tx.customer.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
+    const data = await tx.customer.findMany({ where, include:{_count:{select:{sites:true}}}, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
     return { data, pagination: pagination(page, pageSize, total) };
   });
 }
@@ -80,3 +80,7 @@ export function archiveCustomer(user: Principal, id: string, version: number) {
     return tx.customer.update({ where: { id, version }, data: { isArchived: true, archivedAt: new Date(), version: { increment: 1 } } });
   });
 }
+
+export function customerCities(user:Principal){return atomic(async tx=>(await tx.site.groupBy({by:['city'],where:{customer:customerScope(user)},orderBy:{city:'asc'}})).map(s=>s.city));}
+
+export function customerActivities(user:Principal,id:string,query:{page:number;pageSize:number}){return atomic(async tx=>{await requireCustomer(tx,user,id);const where={lead:{AND:[{customerId:id},leadScope(user)]}};return {data:await tx.leadActivity.findMany({where,include:{actor:{select:{id:true,name:true}}},skip:(query.page-1)*query.pageSize,take:query.pageSize,orderBy:[{createdAt:'desc'},{id:'desc'}]}),pagination:pagination(query.page,query.pageSize,await tx.leadActivity.count({where}))};});}

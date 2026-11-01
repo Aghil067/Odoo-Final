@@ -24,6 +24,7 @@ export type CustomerSource =
  */
 export interface Customer {
   id: string;
+  version?: number;
   customerId: string;           // Human-readable ID e.g. CUST-0001
   customerType: CustomerType;
   fullName: string;             // Full name or business name
@@ -45,7 +46,7 @@ export interface Customer {
   source?: CustomerSource;
   notes?: string;
   status: CustomerStatus;
-  numberOfSites: number;        // Count of linked site surveys (future)
+  numberOfSites: number | null;        // Count of linked site surveys (future)
 
   // Timestamps
   createdAt: string;            // ISO 8601
@@ -55,13 +56,14 @@ export interface Customer {
 /** Summary record used in list views (lighter than full Customer) */
 export interface CustomerSummary {
   id: string;
+  version?: number;
   customerId: string;
   fullName: string;
   phone: string;
   email?: string;
   customerType: CustomerType;
   city?: string;
-  numberOfSites: number;
+  numberOfSites: number | null;
   status: CustomerStatus;
   createdAt: string;
 }
@@ -70,6 +72,7 @@ export interface CustomerSummary {
 
 /** Body sent to POST /api/customers or PUT /api/customers/:id @provisional */
 export interface CustomerFormData {
+  version?:number;
   customerType: CustomerType;
   fullName: string;
   contactPerson?: string;
@@ -91,7 +94,9 @@ export interface CustomerFormData {
 /** Activity event on a customer timeline */
 export interface CustomerActivity {
   id: string;
+  version?: number;
   type:
+    | 'activity_recorded'
     | 'customer_created'
     | 'enquiry_created'
     | 'follow_up_scheduled'

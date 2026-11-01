@@ -26,6 +26,7 @@ export function FollowUpsPage() {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState(''),[retry,setRetry]=useState(0);
 
   // Filters
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue'>('all');
@@ -40,7 +41,7 @@ export function FollowUpsPage() {
   useEffect(() => {
     async function loadFollowUps() {
       try {
-        setIsLoading(true);
+        setIsLoading(true);setError('');
         const res = await followUpService.list({
           dateFilter,
           page,
@@ -49,19 +50,19 @@ export function FollowUpsPage() {
         setFollowUps(res.data);
         setTotal(res.total);
       } catch (err) {
-        console.error('Failed to load follow-ups', err);
+        setError(err instanceof Error?err.message:'The requested records are unavailable.');
       } finally {
         setIsLoading(false);
       }
     }
     loadFollowUps();
-  }, [dateFilter, page]);
+  }, [dateFilter, page,retry]);
 
   const handleMarkComplete = async (id: string) => {
     if (!outcomeNote.trim()) return;
     try {
       setIsSubmitting(true);
-      await followUpService.complete(id, { outcomeNote });
+      await followUpService.complete(id, { outcomeNote,version:followUps.find(f=>f.id===id)?.version });
       setCompletingId(null);
       setOutcomeNote('');
       // Refresh list
@@ -69,7 +70,7 @@ export function FollowUpsPage() {
       setFollowUps(res.data);
       setTotal(res.total);
     } catch (err) {
-      console.error('Failed to complete follow-up', err);
+      setError(err instanceof Error?err.message:'Follow-up was not completed.');
     } finally {
       setIsSubmitting(false);
     }
@@ -77,18 +78,17 @@ export function FollowUpsPage() {
 
   const handleCancel = async (id: string) => {
     try {
-      await followUpService.cancel(id);
+      await followUpService.cancel(id,followUps.find(f=>f.id===id)?.version);
       const res = await followUpService.list({ dateFilter, page, pageSize });
       setFollowUps(res.data);
       setTotal(res.total);
     } catch (err) {
-      console.error('Failed to cancel follow-up', err);
+      setError(err instanceof Error?err.message:'Follow-up was not canceled.');
     }
   };
 
   const isItemOverdue = (item: FollowUp) => {
-    const today = new Date().toISOString().split('T')[0];
-    return item.status === 'pending' && item.followUpDate < today;
+    return item.status === 'pending' && new Date(item.followUpDate).getTime() < Date.now();
   };
 
   const columns: Column<FollowUp>[] = [
@@ -127,7 +127,7 @@ export function FollowUpsPage() {
         <div className="text-xs">
           <div className={`font-semibold ${isItemOverdue(item) ? 'text-red-600 flex items-center gap-1' : 'text-slate-800'}`}>
             {isItemOverdue(item) && <AlertCircle className="w-3.5 h-3.5 text-red-500" />}
-            {item.followUpDate}
+            {new Date(item.followUpDate).toLocaleDateString()}
           </div>
           <span className="text-slate-400">{item.followUpTime}</span>
         </div>
@@ -227,7 +227,7 @@ export function FollowUpsPage() {
             dateFilter === 'today' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
         >
-          <Clock className="w-3.5 h-3.5" /> Due Today
+          <Clock className="w-3.5 h-3.5" /> Due Today (UTC)
         </button>
         <button
           onClick={() => {
@@ -280,7 +280,7 @@ export function FollowUpsPage() {
       )}
 
       {/* Main Table */}
-      <DataTable
+      {error?<Card><p role="alert" className="text-red-700">{error}</p><Button onClick={()=>setRetry(v=>v+1)}>Retry Records</Button></Card>:<DataTable
         columns={columns}
         data={followUps}
         isLoading={isLoading}
@@ -290,7 +290,7 @@ export function FollowUpsPage() {
         total={total}
         onPageChange={setPage}
         emptyMessage="No follow-up records found."
-      />
+      />}
     </div>
   );
 }

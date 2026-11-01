@@ -12,11 +12,11 @@ export function createSite(user: Principal, customerId: string, input: z.infer<t
   });
 }
 
-export function listSites(user: Principal, customerId: string, query: z.infer<typeof v.timelineQuery>) {
+export function listSites(user: Principal, customerId: string, query: z.infer<typeof v.siteQuery>) {
   return atomic(async tx => {
     await requireCustomer(tx, user, customerId);
     const { page, pageSize } = query;
-    const where = { customerId };
+    const where = { customerId,...(query.q?{OR:[{name:{contains:query.q,mode:'insensitive' as const}},{city:{contains:query.q,mode:'insensitive' as const}},{addressLine1:{contains:query.q,mode:'insensitive' as const}}]}:{}) };
     const total = await tx.site.count({ where });
     const data = await tx.site.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize });
     return { data, pagination: pagination(page, pageSize, total) };

@@ -3,6 +3,8 @@
  * Comprehensive detail view for an Enquiry with stage pipeline, status change actions, follow-up scheduling, and customer reference.
  */
 import { useEffect, useState } from 'react';
+import {useAuth} from '../../auth/hooks/useAuth';
+import {LeadAssignmentForm} from '../components/LeadAssignmentForm';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -29,6 +31,7 @@ import type { Enquiry, EnquiryStatus } from '../types/enquiry.types';
 import type { FollowUp, FollowUpFormData } from '../types/followUp.types';
 import {
   ENQUIRY_STATUS_LABELS,
+  CRM_LEAD_TRANSITIONS,
   ENQUIRY_STATUS_COLOURS,
   SYSTEM_TYPE_LABELS,
   CAPACITY_LABELS,
@@ -46,7 +49,8 @@ import {
 
 export function EnquiryDetailsPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const navigate = useNavigate(),{user}=useAuth();
+  const [loadError,setLoadError]=useState(''),[actionError,setActionError]=useState(''),[retry,setRetry]=useState(0);
 
   const [enquiry, setEnquiry] = useState<Enquiry | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
@@ -65,46 +69,44 @@ export function EnquiryDetailsPage() {
     async function load() {
       if (!id) return;
       try {
-        setIsLoading(true);
+        setIsLoading(true);setLoadError('');
         const [enqData, fuList] = await Promise.all([
           enquiryService.getById(id),
-          followUpService.list({ search: id }),
+          followUpService.getByLeadId(id),
         ]);
         setEnquiry(enqData);
         if (enqData) setSelectedStatus(enqData.status);
-        setFollowUps(fuList.data);
+        setFollowUps(fuList);
       } catch (err) {
-        console.error('Failed to load enquiry details', err);
+        setLoadError(err instanceof Error?err.message:'Enquiry is unavailable.');
       } finally {
         setIsLoading(false);
       }
     }
     load();
-  }, [id]);
+  }, [id,retry]);
 
-  const handlePipelineStatusClick = async (newStatus: EnquiryStatus) => {
+  const handlePipelineStatusClick = (newStatus: EnquiryStatus) => {
     if (!id || !enquiry) return;
-    try {
-      const updated = await enquiryService.updateStatus(id, { status: newStatus });
-      setEnquiry(updated);
-      setSelectedStatus(newStatus);
-    } catch (err) {
-      console.error('Failed to update pipeline stage', err);
-    }
+    setSelectedStatus(newStatus);
+    setLostReason('');
+    setIsChangingStatus(true);
   };
 
   const handleStatusSubmit = async () => {
-    if (!id || !enquiry) return;
+    if (!id || !enquiry || !lostReason.trim()) return;
     try {
-      setStatusUpdateLoading(true);
+      setStatusUpdateLoading(true);setActionError('');
       const updated = await enquiryService.updateStatus(id, {
+        version:enquiry?.version,
         status: selectedStatus,
-        lostReason: selectedStatus === 'lost' ? lostReason : undefined,
+        reason: lostReason,
+        lostReason: ['lost','disqualified'].includes(selectedStatus) ? lostReason : undefined,
       });
       setEnquiry(updated);
       setIsChangingStatus(false);
     } catch (err) {
-      console.error('Failed to update status', err);
+      setActionError(err instanceof Error?err.message:'Status was not changed.');
     } finally {
       setStatusUpdateLoading(false);
     }
@@ -118,7 +120,8 @@ export function EnquiryDetailsPage() {
         customerId: enquiry.customerId,
         enquiryId: enquiry.id,
       });
-      setFollowUps((prev) => [created, ...prev]);
+      setFollowUps([created]);
+      if(id)setEnquiry(await enquiryService.getById(id));
       setShowFollowUpModal(false);
     } catch (err) {
       console.error('Failed to schedule follow-up', err);
@@ -129,6 +132,7 @@ export function EnquiryDetailsPage() {
     return <div className="p-16 text-center text-sm text-slate-500">Loading solar enquiry details...</div>;
   }
 
+  if(loadError)return <Card><p role="alert" className="text-red-700">{loadError}</p><Button onClick={()=>setRetry(v=>v+1)}>Retry Enquiry</Button></Card>;
   if (!enquiry) {
     return (
       <div className="text-center py-16">
@@ -140,10 +144,13 @@ export function EnquiryDetailsPage() {
     );
   }
 
-  const allStatuses = Object.entries(ENQUIRY_STATUS_LABELS).map(([k, v]) => ({ value: k, label: v }));
+  const allStatuses = [{value:'',label:'Select Valid Transition'},...(CRM_LEAD_TRANSITIONS[enquiry.status]??[]).map(k=>({value:k,label:ENQUIRY_STATUS_LABELS[k]}))];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {actionError&&<p role="alert" className="text-red-700">{actionError}</p>}
+      {!['lost','disqualified'].includes(enquiry.status)&&<Link className="text-green-700" to={'/crm/enquiries/'+enquiry.id+'/edit'}>Edit Current Enquiry Requirements</Link>}
+      {user?.role==='admin'&&!['lost','disqualified'].includes(enquiry.status)&&<LeadAssignmentForm key={enquiry.version} lead={enquiry} onSaved={async()=>{setEnquiry(await enquiryService.getById(enquiry.id));}}/>}
       {/* Top Banner & Quick Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div className="flex items-center gap-3">
@@ -230,9 +237,9 @@ export function EnquiryDetailsPage() {
               onChange={(e) => setSelectedStatus(e.target.value as EnquiryStatus)}
             />
 
-            {selectedStatus === 'lost' && (
+            {(
               <Textarea
-                label="Reason for Lost Enquiry"
+                label="Explicit CRM Transition Reason"
                 placeholder="Competitor price, budget issue, roof unsuitable..."
                 value={lostReason}
                 onChange={(e) => setLostReason(e.target.value)}
@@ -243,7 +250,7 @@ export function EnquiryDetailsPage() {
             <Button size="sm" variant="outline" onClick={() => setIsChangingStatus(false)}>
               Cancel
             </Button>
-            <Button size="sm" variant="primary" onClick={handleStatusSubmit} isLoading={statusUpdateLoading}>
+            <Button size="sm" variant="primary" onClick={handleStatusSubmit} isLoading={statusUpdateLoading} disabled={!lostReason.trim()||!(CRM_LEAD_TRANSITIONS[enquiry.status]??[]).includes(selectedStatus)}>
               Confirm Status
             </Button>
           </div>
@@ -292,7 +299,7 @@ export function EnquiryDetailsPage() {
 
               <div>
                 <span className="text-xs text-slate-400 block">Property Type</span>
-                <span className="font-medium text-slate-800">{PROPERTY_TYPE_LABELS[enquiry.propertyType]}</span>
+                <span className="font-medium text-slate-800">{(enquiry.propertyType?PROPERTY_TYPE_LABELS[enquiry.propertyType]:'Not recorded')}</span>
               </div>
 
               <div>

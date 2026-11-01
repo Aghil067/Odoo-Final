@@ -52,6 +52,7 @@ export function CRMDashboardPage() {
   const [recentEnquiries, setRecentEnquiries] = useState<EnquirySummary[]>([]);
   const [upcomingFollowUps, setUpcomingFollowUps] = useState<FollowUp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -81,7 +82,7 @@ export function CRMDashboardPage() {
         setRecentEnquiries(recentEnq.data);
         setUpcomingFollowUps(dueFu.data);
       } catch (err) {
-        console.error('Error loading CRM Dashboard data:', err);
+        setError(err instanceof Error?err.message:'Could not load CRM summary');
       } finally {
         setIsLoading(false);
       }
@@ -89,6 +90,7 @@ export function CRMDashboardPage() {
     loadData();
   }, []);
 
+  if(error)return <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700"><h1 className="font-semibold">CRM Dashboard unavailable</h1><p>{error}</p><Button variant="outline" onClick={()=>window.location.reload()}>Retry</Button></div>;
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Top Banner & Quick Actions */}
@@ -176,11 +178,11 @@ export function CRMDashboardPage() {
 
         <Card padding={false} className="p-4 border-l-4 border-l-emerald-500">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-medium">Won / Converted</span>
+            <span className="text-xs font-medium">Accepted Orders</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-slate-800">{isLoading ? '—' : stats.wonEnquiries}</div>
-          <span className="text-[11px] text-slate-400">Ready for survey/install</span>
+          <span className="text-[11px] text-slate-400">Customer accepted commercial commitments</span>
         </Card>
       </div>
 

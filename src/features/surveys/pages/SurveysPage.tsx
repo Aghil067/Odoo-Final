@@ -24,7 +24,7 @@ import {
 } from '../types/survey.types';
 import { SYSTEM_TYPE_LABELS, CAPACITY_LABELS } from '../../crm/types/enquiry.types';
 
-export function SurveysPage() {
+export function SurveysPage({approvalsOnly=false}:{approvalsOnly?:boolean}) {
   const { user } = useAuth();
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [total, setTotal] = useState(0);
@@ -32,7 +32,7 @@ export function SurveysPage() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<SurveyStatus | ''>('');
+  const [status, setStatus] = useState<SurveyStatus | ''>(approvalsOnly?'submitted':'');
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -41,7 +41,7 @@ export function SurveysPage() {
       try {
         setIsLoading(true);
         // If logged-in user is a surveyor, default filter to their assigned surveys
-        const surveyorFilter = user?.role === 'surveyor' ? user.id : undefined;
+        const surveyorFilter = user?.role === 'technician' ? user.id : undefined;
 
         const res = await surveyService.list({
           search,
@@ -105,7 +105,7 @@ export function SurveysPage() {
       render: (item) => (
         <div className="text-xs">
           <span className="font-semibold text-slate-800 block">
-            {CAPACITY_LABELS[item.requestedCapacity] || item.requestedCapacity}
+            {item.requestedCapacity==='custom'?`${item.customRequestedCapacity} kW`:CAPACITY_LABELS[item.requestedCapacity] || item.requestedCapacity}
           </span>
           <span className="text-slate-400">{SYSTEM_TYPE_LABELS[item.systemType]}</span>
         </div>
@@ -137,8 +137,7 @@ export function SurveysPage() {
       className: 'text-right',
       render: (item) => {
         const canEdit =
-          user?.role === 'admin' ||
-          (user?.role === 'surveyor' &&
+          (user?.role === 'technician' &&
             item.status !== 'approved' &&
             item.status !== 'rejected' &&
             item.status !== 'cancelled');
@@ -168,15 +167,15 @@ export function SurveysPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Site Surveys</h1>
+          <h1 className="text-2xl font-bold text-slate-800">{approvalsOnly?'Survey Approval Center':'Site Surveys'}</h1>
           <p className="text-sm text-slate-500">
-            {user?.role === 'surveyor'
+            {user?.role === 'technician'
               ? 'Inspections and feasibility assessments assigned to you.'
               : 'Physical site assessments, shadow calculations, and rooftop records.'}
           </p>
         </div>
 
-        <PermissionGuard module="site_survey" require="assigned_only">
+        <PermissionGuard module="site_survey" require="full">
           <Link to="/surveys/new">
             <Button size="sm" variant="primary" leftIcon={<PlusCircle className="w-4 h-4" />}>
               Create Survey Request
@@ -201,7 +200,7 @@ export function SurveysPage() {
         <Select
           options={[
             { value: '', label: 'All Survey Statuses' },
-            ...Object.entries(SURVEY_STATUS_LABELS).map(([k, v]) => ({ value: k, label: v })),
+            ...Object.entries(SURVEY_STATUS_LABELS).filter(([k])=>!['draft','assigned'].includes(k)).map(([k, v]) => ({ value: k, label: v })),
           ]}
           value={status}
           onChange={(e) => {

@@ -10,14 +10,14 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { SurveyForm } from '../components/SurveyForm';
 import { surveyService } from '../services/surveyService';
-import type { CreateSurveyRequestData } from '../types/survey.types';
+
 
 export function SurveyCreatePage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (data: CreateSurveyRequestData) => {
+  const handleSubmit = async (data: {leadId:string;siteId:string;requestNotes:string;previousSurveyId?:string}) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -37,9 +37,9 @@ export function SurveyCreatePage() {
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Schedule Site Survey</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Request Site Survey</h1>
           <p className="text-sm text-slate-500">
-            Dispatch a field surveyor to conduct technical measurements and shadow evaluations.
+            Link an eligible CRM lead to its existing installation site.
           </p>
         </div>
       </div>

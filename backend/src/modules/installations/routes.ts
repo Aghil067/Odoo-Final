@@ -15,6 +15,7 @@ export function createInstallationRouter(storage:SurveyStorage=new LocalSurveySt
  const id=(req:Request)=>v.path.parse(req.params).id;
  const list=(res:Response,r:{data:unknown;pagination:unknown})=>success(res,r.data,200,{pagination:r.pagination});
  const editors=allowRoles('ADMIN','TECHNICIAN');
+ router.get('/assignees',allowRoles('ADMIN'),async(req,res)=>list(res,await read.assignees(actor(req),v.assignees.parse(req.query))));
  router.get('/summary',async(req,res)=>{v.page.pick({}).parse(req.query);return success(res,await read.summary(actor(req)));});
  router.get('/',async(req,res)=>list(res,await read.listJobs(actor(req),v.list.parse(req.query))));
  router.post('/',allowRoles('ADMIN'),async(req,res)=>success(res,await jobs.createJob(actor(req),v.create.parse(req.body)),201));

@@ -1,0 +1,3 @@
+import {Input} from '../../../components/ui/Input';
+import {Textarea} from '../../../components/ui/Textarea';
+export function StockPostingFields({reference,reason,onChange}:{reference:string;reason:string;onChange:(value:{reference:string;reason:string})=>void}){return <div className="grid sm:grid-cols-2 gap-3"><Input label="Operation Reference" required maxLength={100} value={reference} onChange={e=>onChange({reference:e.target.value,reason})} hint="Use a unique warehouse document or internal posting reference."/><Textarea label="Operation Reason" required maxLength={2000} value={reason} onChange={e=>onChange({reference,reason:e.target.value})}/></div>;}

@@ -1,86 +1,13 @@
-/**
- * SurveyExecutionPage.tsx
- * ─────────────────────────────────────────────────────────────
- * Page loaded when a surveyor records on-site physical inspection findings.
- */
-
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '../../../components/ui/Button';
-import { SurveyExecutionForm } from '../components/SurveyExecutionForm';
-import { surveyService } from '../services/surveyService';
-import type { Survey, SurveyExecutionData } from '../types/survey.types';
-
-export function SurveyExecutionPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
-  const [survey, setSurvey] = useState<Survey | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function load() {
-      if (!id) return;
-      try {
-        setIsLoading(true);
-        const data = await surveyService.getById(id);
-        setSurvey(data);
-      } catch (err) {
-        console.error('Failed to load survey for execution', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    load();
-  }, [id]);
-
-  const handleSubmit = async (data: SurveyExecutionData) => {
-    if (!id) return;
-    try {
-      setIsSaving(true);
-      setError(null);
-      await surveyService.saveExecution(id, data);
-      navigate(`/surveys/${id}`);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save survey findings');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="p-16 text-center text-sm text-slate-500">Loading inspection form...</div>;
-  }
-
-  if (!survey) {
-    return <div className="p-16 text-center text-sm text-slate-500">Survey record not found.</div>;
-  }
-
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3 pb-2 border-b border-slate-200">
-        <Button size="sm" variant="ghost" onClick={() => navigate(-1)} className="p-1.5">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Record Site Inspection Findings</h1>
-          <p className="text-sm text-slate-500">
-            {survey.surveyId} • {survey.customerName} ({survey.siteName})
-          </p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm" role="alert">
-          {error}
-        </div>
-      )}
-
-      <SurveyExecutionForm survey={survey} onSubmit={handleSubmit} isLoading={isSaving} />
-    </div>
-  );
+import {useEffect,useState} from 'react';
+import {useParams,Link} from 'react-router-dom';
+import {useAuth} from '../../auth/hooks/useAuth';
+import {surveyService,type SurveyRecord} from '../services/surveyService';
+import {AssessmentFields,roofFields,electricalFields,feasibilityFields} from '../components/AssessmentFields';
+export function SurveyExecutionPage(){
+ const {id}=useParams(),{user}=useAuth();const [survey,setSurvey]=useState<SurveyRecord|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+ async function load(){if(!id)return;setSurvey(await surveyService.getRecord(id));}
+ useEffect(()=>{load().catch(e=>setError(e.message)).finally(()=>setLoading(false));},[id]);
+ if(loading)return <p role="status">Loading inspection...</p>;if(error)return <p role="alert" className="text-red-700">{error}</p>;if(!survey)return <p>Survey not found.</p>;
+ const editable=user?.role==='technician'&&survey.assignedToId===user.id&&['IN_PROGRESS','REVISION_REQUIRED'].includes(survey.status);
+ return <div className="space-y-6 max-w-5xl mx-auto"><div><Link className="text-green-700 text-sm" to={`/surveys/${id}`}>Back to survey</Link><h1 className="text-2xl font-bold text-slate-800">Record Site Inspection Findings</h1><p className="text-sm text-slate-500">{survey.reference} / {survey.customer?.name} / {survey.site?.name}</p></div>{!editable&&<p className="text-amber-800">Only the assigned technician may edit findings during an active visit or revision.</p>}<AssessmentFields key={`roof-${survey.id}`} title="Roof Findings" fields={roofFields} initial={survey.roofAssessment??{}} readOnly={!editable} onSave={async data=>{await surveyService.assessment(survey.id,'roof',survey.version,data);await load();}}/><AssessmentFields key={`electrical-${survey.id}`} title="Electrical Findings" fields={electricalFields} initial={survey.electricalAssessment??{}} readOnly={!editable} onSave={async data=>{await surveyService.assessment(survey.id,'electrical',survey.version,data);await load();}}/><AssessmentFields key={`feasibility-${survey.id}`} title="Feasibility Assessment" fields={feasibilityFields} initial={{...survey}} readOnly={!editable} onSave={async data=>{await surveyService.feasibility(survey.id,survey.version,data);await load();}}/><p className="text-xs text-slate-500">These observations support internal feasibility review. They do not certify electrical or structural safety. Record actual observations and measurements.</p></div>;
 }
-

@@ -9,6 +9,7 @@ export const milestonePath=path.extend({milestoneId:uuid});
 export const issuePath=path.extend({issueId:uuid});
 export const attachmentPath=path.extend({attachmentId:uuid});
 export const page=pageQuery.strict();
+export const assignees=page.extend({q:text(160).optional(),role:z.enum(['ADMIN','TECHNICIAN'])});
 export const list=page.extend({q:text(160).optional(),status:z.enum(InstallationStatus).optional(),customerId:uuid.optional(),leadId:uuid.optional(),siteId:uuid.optional()});
 export const ids=z.array(uuid).max(100).refine(a=>new Set(a).size===a.length,'Duplicate IDs');
 export const evidence=ids.min(1);

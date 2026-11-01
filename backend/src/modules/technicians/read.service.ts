@@ -17,8 +17,8 @@ export function profiles(user:Principal,q:z.infer<typeof v.list>){return workfor
  return {data:rows.map(r=>({...r,technicianProfile:r.technicianProfile?privateProfile(r.technicianProfile,user):null})),pagination:pagination(q.page,q.pageSize,await tx.user.count({where}))};
 });}
 export function detail(user:Principal,id:string){return workforceAtomic(async tx=>{own(user,id);const identity=await technician(tx,id);const p=await tx.technicianProfile.findUnique({where:{userId:id}});return {user:identity,profile:p?privateProfile(p,user):null};});}
-export function catalog(user:Principal,q:z.infer<typeof v.page>){return workforceAtomic(async tx=>{
- if(!['ADMIN','TECHNICIAN'].includes(user.role))throw new ApiError(403,'WORKFORCE_SCOPE','Skill catalog workforce access required');const where=user.role==='ADMIN'?{}:{isActive:true};return {data:await tx.skillCatalog.findMany({where,...paging(q),orderBy:{code:'asc'}}),pagination:pagination(q.page,q.pageSize,await tx.skillCatalog.count({where}))};
+export function catalog(user:Principal,q:z.infer<typeof v.list>){return workforceAtomic(async tx=>{
+ if(!['ADMIN','TECHNICIAN'].includes(user.role))throw new ApiError(403,'WORKFORCE_SCOPE','Skill catalog workforce access required');const where:Prisma.SkillCatalogWhereInput={...(user.role==='ADMIN'?{}:{isActive:true}),...(q.q?{OR:[{code:{contains:q.q,mode:'insensitive'}},{name:{contains:q.q,mode:'insensitive'}}]}:{})};return {data:await tx.skillCatalog.findMany({where,...paging(q),orderBy:{code:'asc'}}),pagination:pagination(q.page,q.pageSize,await tx.skillCatalog.count({where}))};
 });}
 export function collection(user:Principal,id:string,q:z.infer<typeof v.page>,kind:'skills'|'certifications'|'schedule'|'exceptions'|'history'){return workforceAtomic(async tx=>{
  own(user,id);await technician(tx,id);const where={userId:id},p=paging(q);let data:unknown,total:number;

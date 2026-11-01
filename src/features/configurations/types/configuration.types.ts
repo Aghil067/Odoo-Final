@@ -140,6 +140,7 @@ export const CONFIGURATION_STATUS_COLOURS: Record<ConfigurationStatus, string> =
 };
 
 export const SYSTEM_TYPE_COLOURS: Record<SystemType, string> = {
+  undecided:'bg-slate-50 text-slate-700',
   on_grid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   off_grid: 'bg-amber-50 text-amber-700 border-amber-200',
 };

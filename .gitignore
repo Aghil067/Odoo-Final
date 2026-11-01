@@ -54,3 +54,6 @@ credentials*.json
 *.backup
 pgdata/
 postgres-data/
+.runtime/
+playwright-report/
+test-results/
