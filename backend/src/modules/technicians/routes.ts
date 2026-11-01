@@ -15,7 +15,7 @@ const list=(res:Response,r:{data:unknown;pagination:unknown})=>success(res,r.dat
 const report=v.reportQuery.extend({pageSize:z.coerce.number().int().min(1).max(20).default(20)});
 const windowList=v.availabilityList.extend({pageSize:z.coerce.number().int().min(1).max(20).default(20)});
 technicianRouter.get('/me',privateRoles,async(req,res)=>success(res,await read.detail(actor(req),actor(req).id)));
-technicianRouter.get('/skills/catalog',privateRoles,async(req,res)=>list(res,await read.catalog(actor(req),v.page.parse(req.query))));
+technicianRouter.get('/skills/catalog',privateRoles,async(req,res)=>list(res,await read.catalog(actor(req),v.list.parse(req.query))));
 technicianRouter.post('/skills/catalog',admin,async(req,res)=>success(res,await profiles.createCatalog(actor(req),v.catalog.parse(req.body)),201));
 technicianRouter.patch('/skills/catalog/:id',admin,async(req,res)=>success(res,await profiles.updateCatalog(actor(req),id(req),v.catalogPatch.parse(req.body))));
 technicianRouter.get('/teams',privateRoles,async(req,res)=>list(res,await read.teams(actor(req),v.page.parse(req.query))));
