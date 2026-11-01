@@ -6,12 +6,9 @@
  * FEATURES:
  *  - Email + password form with client-side validation
  *  - Show/hide password toggle
- *  - Remember me checkbox (passed to auth service)
  *  - Loading state while the login request is in flight
  *  - Error message display on invalid credentials
  *  - Redirect to intended destination after login (or /dashboard)
- *  - DEV ONLY: Quick-select panel for mock role accounts
- *    (hidden in production builds via import.meta.env.PROD)
  *
  * DESIGN:
  *  Professional solar-energy theme.
@@ -50,9 +47,6 @@ function validate(values: FormValues): FormErrors {
   }
   return errors;
 }
-
-// ─── Role colour helper ─────────────────────────────────────────
-
 
 // ─── Component ──────────────────────────────────────────────────
 export function LoginPage() {
@@ -100,9 +94,6 @@ export function LoginPage() {
       // Error is already captured in AuthContext and displayed below
     }
   }
-
-  // Dev panel: fill in credentials for a mock account
-
 
   // ── Render ───────────────────────────────────────────────────
   return (

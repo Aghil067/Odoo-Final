@@ -90,7 +90,7 @@ export type PhotoCategory =
 export interface SurveyPhoto {
   id: string;
   category: PhotoCategory;
-  url: string; // Base64 or mock URL
+  url: string; // Authorized attachment download URL
   fileName: string;
   fileSizeBytes: number;
   description?: string;

@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {Prisma,type FinanceEntityKind,type FinanceEvidenceType} from '@prisma/client';
+import {Prisma,type FinanceEvidenceType} from '@prisma/client';
 import {z} from 'zod';
 import type {Principal} from '../auth/auth.js';
 import {ApiError} from '../../lib/http.js';

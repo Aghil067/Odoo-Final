@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { InstallationStatus, InstallationMilestoneType, InstallationMilestoneStatus, InstallationIssueType, InstallationSeverity, InstallationTestType, InstallationTestResult, InstallationReviewDecision } from '@prisma/client';
+import { InstallationStatus, InstallationMilestoneStatus, InstallationIssueType, InstallationSeverity, InstallationTestType, InstallationTestResult, InstallationReviewDecision } from '@prisma/client';
 import { uuid,pageQuery } from '../crm/validation.js';
 export const text=(max=2000)=>z.string().trim().min(1).max(max);
 export const version=z.number().int().min(1).max(2147483646);

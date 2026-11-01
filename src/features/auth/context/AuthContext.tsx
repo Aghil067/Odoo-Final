@@ -66,7 +66,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 // ─── Provider ──────────────────────────────────────────────────
 interface AuthProviderProps {
   children: ReactNode;
-  /** Injected authentication service (mock or real). */
+  /** Injected authentication contract; production uses the shared API client. */
   service: IAuthService;
 }
 

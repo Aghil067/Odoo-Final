@@ -2,7 +2,7 @@ import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {randomBytes,randomUUID} from 'node:crypto';
-import {readFile,writeFile} from 'node:fs/promises';
+import {readFile,writeFile,readdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 
 process.loadEnvFile(resolve('../.runtime/backend.env'));
@@ -31,9 +31,10 @@ before(async()=>{
 });
 after(async()=>{if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}await db.$disconnect();});
 
-test('all nine migrations are actually applied and core tables/constraints/triggers exist',async()=>{
+test('all checked-in migrations are actually applied and core tables/constraints/triggers exist',async()=>{
  const migrations=await db.$queryRaw`SELECT migration_name,finished_at,rolled_back_at FROM _prisma_migrations ORDER BY migration_name`;
- assert.equal(migrations.filter(m=>m.finished_at&&!m.rolled_back_at).length,9);
+ const expected=(await readdir('prisma/migrations',{withFileTypes:true})).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();
+ assert.deepEqual(migrations.filter(m=>m.finished_at&&!m.rolled_back_at).map(m=>m.migration_name).sort(),expected);
  const constraints=await db.$queryRaw`SELECT count(*)::int AS count FROM pg_constraint WHERE contype='f' AND connamespace='public'::regnamespace`;
  assert.ok(constraints[0].count>100);
  const triggers=await db.$queryRaw`SELECT count(*)::int AS count FROM pg_trigger WHERE NOT tgisinternal`;
