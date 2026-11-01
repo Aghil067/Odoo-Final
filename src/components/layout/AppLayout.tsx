@@ -14,7 +14,7 @@
  * All authenticated routes should be children of this layout route.
  */
 
-import { useState } from 'react';
+import { Suspense,useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -42,7 +42,7 @@ export function AppLayout() {
           aria-label="Main content"
         >
           <div className="p-4 lg:p-6 h-full">
-            <Outlet />
+            <Suspense fallback={<p role="status" className="text-sm text-slate-500">Loading application page...</p>}><Outlet /></Suspense>
           </div>
         </main>
       </div>

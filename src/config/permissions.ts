@@ -88,43 +88,43 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
 
   installations: {
     admin:                'full',
-    sales_executive:      'view',
-    surveyor:             'view',
-    inventory_manager:    'view',
-    installation_manager: 'full',
+    sales_executive:      'assigned_only',
+    surveyor:             'none',
+    inventory_manager:    'none',
+    installation_manager: 'none',
     technician:           'assigned_only',
-    finance_officer:      'none',
-    service_manager:      'view',
+    finance_officer:      'view',
+    service_manager:      'none',
   },
 
   technicians: {
     admin:                'full',
     sales_executive:      'none',
-    surveyor:             'view',
+    surveyor:             'none',
     inventory_manager:    'none',
-    installation_manager: 'full',
+    installation_manager: 'none',
     technician:           'assigned_only', // own profile and own assignments
-    finance_officer:      'view',
-    service_manager:      'view',
+    finance_officer:      'none',
+    service_manager:      'none',
   },
 
   warranty: {
     admin:                'full',
-    sales_executive:      'view',
+    sales_executive:      'assigned_only',
     surveyor:             'none',
-    inventory_manager:    'view',
-    installation_manager: 'view',
-    technician:           'view',
+    inventory_manager:    'none',
+    installation_manager: 'none',
+    technician:           'assigned_only',
     finance_officer:      'none',
     service_manager:      'full',
   },
 
   service_management: {
     admin:                'full',
-    sales_executive:      'view',
+    sales_executive:      'assigned_only',
     surveyor:             'none',
-    inventory_manager:    'view',
-    installation_manager: 'view',
+    inventory_manager:    'none',
+    installation_manager: 'none',
     technician:           'assigned_only',
     finance_officer:      'none',
     service_manager:      'full',
@@ -132,13 +132,13 @@ export const PERMISSIONS: Record<ModuleKey, Record<UserRole, PermissionLevel>> =
 
   finance: {
     admin:                'full',
-    sales_executive:      'view',
+    sales_executive:      'assigned_only',
     surveyor:             'none',
     inventory_manager:    'none',
-    installation_manager: 'view',
+    installation_manager: 'none',
     technician:           'none',
     finance_officer:      'full',
-    service_manager:      'view',
+    service_manager:      'assigned_only',
   },
 
   user_management: {

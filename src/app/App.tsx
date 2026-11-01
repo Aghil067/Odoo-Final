@@ -1,18 +1,4 @@
-/**
- * App.tsx
- * ─────────────────────────────────────────────────────────────
- * Application root.
- *
- * Renders:
- *  AuthProvider  → wraps the entire app with auth context
- *    RouterProvider → provides React Router routing
- *
- * The AuthProvider receives the mockAuthService.
- * To switch to a real API service:
- *  1. Implement IAuthService in a new realAuthService.ts
- *  2. Replace the import below
- */
-
+// Application root uses database-backed cookie sessions.
 import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from '../features/auth/context/AuthContext';
 import { realAuthService } from '../features/auth/services/realAuthService';

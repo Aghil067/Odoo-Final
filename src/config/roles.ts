@@ -11,7 +11,7 @@
  *  1. Add it to the UserRole union in auth.types.ts
  *  2. Add its display metadata here
  *  3. Add its permissions in permissions.ts
- *  4. Add a mock user in mockAuthService.ts
+ *  4. Map only an explicitly supported backend role in realAuthService.ts
  */
 
 import type { UserRole } from '../features/auth/types/auth.types';

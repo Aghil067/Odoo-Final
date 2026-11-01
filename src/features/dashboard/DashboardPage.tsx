@@ -1,22 +1,209 @@
-import {useState,useEffect,useMemo} from 'react';
-import {RotateCw,LayoutDashboard} from 'lucide-react';
-import {useAuth} from '../auth/hooks/useAuth';
-import {analyticsService,analyticsViews} from './services/analyticsService';
-import {AnalyticsResult,label} from './components/AnalyticsResult';
-import {Button} from '../../components/ui/Button';
-import {Select} from '../../components/ui/Select';
-import {Input} from '../../components/ui/Input';
-import {Card} from '../../components/ui/Card';
-import {getPage} from '../../services/apiClient';
-const departments:Record<string,string[]>={admin:['overview','sales','surveys','solar','inventory','installations','technicians','warranties','service','finance','reports'],sales_executive:['overview','sales','surveys','solar','installations','reports'],technician:['overview','surveys','solar','installations','technicians','service'],inventory_manager:['overview','inventory'],finance_officer:['overview','inventory','finance','reports'],service_manager:['overview','warranties','service']};
-export function DashboardPage(){
- const {user}=useAuth(),[selected,setSelected]=useState('overview'),[result,setResult]=useState<unknown>(null),[meta,setMeta]=useState<{asOf:string;from:string;to:string}|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true),[refresh,setRefresh]=useState(0),[page,setPage]=useState(1),[target,setTarget]=useState('');
- const [customers,setCustomers]=useState<{id:string;name:string}[]>([]),[projects,setProjects]=useState<{id:string;reference:string}[]>([]);
- const [filters,setFilters]=useState<Record<string,string>>({from:'',to:'',currency:'',groupBy:'month',customerId:'',days:'30'});
- const views=useMemo(()=>analyticsViews.filter(v=>(departments[user?.role??'']??['overview']).includes(v.department)),[user?.role]);
- const baseView=views.find(v=>v.path===selected)??views[0],view=baseView?.path.includes(':id')?{...baseView,path:baseView.path.replace(':id',target)}:baseView;
- useEffect(()=>{if(user?.role==='finance_officer'){void getPage<{id:string;name:string}>('/finance/customers',{pageSize:100}).then(r=>setCustomers(r.data)).catch(e=>setError(e.message));void getPage<{installationId:string|null;reference:string}>('/finance/orders',{pageSize:100}).then(r=>setProjects([...new Map(r.data.filter(o=>o.installationId).map(o=>[o.installationId!,{id:o.installationId!,reference:o.reference}])).values()])).catch(e=>setError(e.message));}if(user?.role==='admin'||user?.role==='sales_executive')void getPage<{id:string;name:string}>('/customers',{pageSize:100}).then(r=>setCustomers(r.data)).catch(e=>setError(e.message));if(['admin','sales_executive','technician'].includes(user?.role??''))void getPage<{id:string;reference:string}>('/installations',{pageSize:100}).then(r=>setProjects(r.data)).catch(e=>setError(e.message));},[user?.role]);
- useEffect(()=>{if(!view)return;const controller=new AbortController();setError(null);setResult(null);if(baseView?.path.includes(':id')&&!target){setLoading(false);return;}setLoading(true);const dateParams={...filters,from:filters.from?new Date(filters.from+'T00:00:00Z').toISOString():undefined,to:filters.to?new Date(new Date(filters.to+'T00:00:00Z').getTime()+86400000).toISOString():undefined,page,pageSize:view.path==='technicians/availability'?5:20};void analyticsService.read(view,dateParams,controller.signal).then(r=>{setResult(r.data);setMeta(r.meta);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return ()=>controller.abort();},[selected,target,filters,page,refresh]);
- const pagination=result&&typeof result==='object'&&'pagination'in result?result.pagination as {page:number;totalPages:number;totalItems:number}:null;
- return <div className="space-y-6 max-w-[1600px] mx-auto"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4"><div><h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><LayoutDashboard className="text-green-600"/>Dashboard & Analytics</h1><p className="text-sm text-slate-500">Authorized database reports. Unavailable values are never replaced with demo numbers.</p></div><Button variant="outline" onClick={()=>setRefresh(n=>n+1)} disabled={loading}><RotateCw className="w-4 h-4 mr-2"/>Refresh</Button></div><div className="flex gap-2 overflow-x-auto border-b border-slate-200">{(departments[user?.role??'']??['overview']).map(department=><button key={department} onClick={()=>{setSelected(views.find(v=>v.department===department)!.path);setPage(1);setTarget('');}} className={'px-4 py-3 text-sm font-semibold whitespace-nowrap '+(baseView?.department===department?'border-b-2 border-green-600 text-green-700':'text-slate-500')}>{label(department)}</button>)}</div><Card><div className="grid md:grid-cols-3 xl:grid-cols-5 gap-3"><Select label="Report" value={selected} options={views.filter(v=>v.department===baseView?.department).map(v=>({value:v.path,label:label(v.label)}))} onChange={e=>{setSelected(e.target.value);setPage(1);setTarget('');}}/>{baseView?.path.includes(':id')&&<Select label={selected.includes('customers')?'Customer':'Installation Project'} value={target} options={[{value:'',label:'Select a record'},...(selected.includes('customers')?customers.map(c=>({value:c.id,label:c.name})):projects.map(p=>({value:p.id,label:p.reference})))]} onChange={e=>setTarget(e.target.value)}/>} {baseView?.filters.includes('from')&&<><Input label="From (UTC)" type="date" value={filters.from} onChange={e=>{setFilters({...filters,from:e.target.value});setPage(1);}}/><Input label="Through (UTC)" type="date" value={filters.to} onChange={e=>{setFilters({...filters,to:e.target.value});setPage(1);}}/></>}{baseView?.filters.includes('currency')&&<Select label="Currency" value={filters.currency} options={[{value:'',label:'Separate currencies'},...['INR','USD','EUR','GBP'].map(c=>({value:c,label:c}))]} onChange={e=>{setFilters({...filters,currency:e.target.value});setPage(1);}}/>}{baseView?.filters.includes('customerId')&&customers.length>0&&<Select label="Customer" value={filters.customerId} options={[{value:'',label:'All authorized customers'},...customers.map(c=>({value:c.id,label:c.name}))]} onChange={e=>{setFilters({...filters,customerId:e.target.value});setPage(1);}}/>}{baseView?.filters.includes('groupBy')&&<Select label="Group By (UTC)" value={filters.groupBy} options={['day','week','month'].map(x=>({value:x,label:label(x)}))} onChange={e=>setFilters({...filters,groupBy:e.target.value})}/>} {baseView?.filters.includes('days')&&<Input label="Expiry Horizon (days)" type="number" min="1" max="90" value={filters.days} onChange={e=>setFilters({...filters,days:e.target.value})}/>}</div><p className="text-xs text-slate-500 mt-3">{baseView?.filters.includes('from')?'Date intervals use UTC; the default is the server-defined report window. Financial balances remain current snapshots of the selected invoice cohort.':'This report uses a current snapshot or an explicit expiry horizon; historical date filtering is not available.'}</p></Card>{error&&<div role="alert" className="rounded-lg border border-red-200 bg-red-50 text-red-800 p-4">{error}</div>}{loading?<div className="py-16 text-center text-slate-500">Loading actual report data...</div>:result!==null?<AnalyticsResult value={result}/>:!error&&<p className="text-slate-500">Choose an authorized record to view this report.</p>}{pagination&&<div className="flex items-center justify-between text-sm"><span>{pagination.totalItems} matching records</span><div className="flex gap-3"><Button variant="outline" disabled={page<=1||loading} onClick={()=>setPage(p=>p-1)}>Previous</Button><span className="py-2">Page {pagination.page} of {pagination.totalPages||1}</span><Button variant="outline" disabled={page>=pagination.totalPages||loading} onClick={()=>setPage(p=>p+1)}>Next</Button></div></div>}{meta&&<p className="text-xs text-slate-400">Database snapshot: {new Date(meta.asOf).toLocaleString()} | UTC interval: {meta.from} to {meta.to}</p>}</div>;
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { RotateCw, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '../auth/hooks/useAuth';
+import { analyticsService, analyticsViews } from './services/analyticsService';
+import { AnalyticsResult, label } from './components/AnalyticsResult';
+import { Button } from '../../components/ui/Button';
+import { Select } from '../../components/ui/Select';
+import { Input } from '../../components/ui/Input';
+import { Card } from '../../components/ui/Card';
+import { PagedRecordSelect, type RecordQuery } from '../../components/common/PagedRecordSelect';
+import { getPage } from '../../services/apiClient';
+const departments: Record<string, string[]> = {
+  admin: [
+    'overview', 'sales', 'surveys', 'solar', 'inventory', 'installations', 'technicians', 'warranties', 'service', 'finance', 'reports'
+  ], sales_executive: [
+    'overview', 'sales', 'surveys', 'solar', 'installations', 'reports'
+  ], technician: [
+    'overview', 'surveys', 'solar', 'installations', 'technicians', 'service'
+  ], inventory_manager: [
+    'overview', 'inventory'
+  ], finance_officer: [
+    'overview', 'inventory', 'finance', 'reports'
+  ], service_manager: [
+    'overview', 'warranties', 'service'
+  ]
+};
+export function DashboardPage() {
+  const { user } = useAuth(), [selected, setSelected] = useState('overview'), [result, setResult] = useState<unknown>(null), [meta, setMeta] = useState<{
+    asOf: string;
+    from: string;
+    to: string;
+  } | null>(null), [error, setError] = useState<string | null>(null), [loading, setLoading] = useState(true), [refresh, setRefresh] = useState(0), [page, setPage] = useState(1), [target, setTarget] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: string;
+    name: string;
+  } | null>(null), [selectedProject, setSelectedProject] = useState<{
+    id: string;
+    reference: string;
+  } | null>(null), [filterCustomer, setFilterCustomer] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const customerQuery = useCallback((q: RecordQuery) => getPage<{
+    id: string;
+    name: string;
+  }>(user?.role === 'finance_officer' ? '/finance/customers' : '/customers', {
+    ...q
+  }), [
+    user?.role
+  ]);
+  const projectQuery = useCallback((q: RecordQuery) => getPage<{
+    id: string;
+    reference: string;
+  }>(user?.role === 'finance_officer' ? '/finance/installations' : '/installations', {
+    ...q
+  }), [
+    user?.role
+  ]);
+  const [filters, setFilters] = useState<Record<string, string>>({
+    from: '', to: '', currency: '', groupBy: 'month', customerId: '', days: '30'
+  });
+  const views = useMemo(() => analyticsViews.filter(v => (departments[user?.role ?? ''] ?? [
+    'overview'
+  ]).includes(v.department)), [
+    user?.role
+  ]);
+  const baseView = views.find(v => v.path === selected) ?? views[0], view = useMemo(() => baseView?.path.includes(':id') ? {
+    ...baseView, path: baseView.path.replace(':id', target)
+  } : baseView, [
+    baseView, target
+  ]);
+  useEffect(() => {
+    if (!view)
+      return;
+    const controller = new AbortController();
+    setError(null);
+    setResult(null);
+    if (baseView?.path.includes(':id') && !target) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const dateParams = {
+      ...filters, from: filters.from ? new Date(filters.from + 'T00:00:00Z').toISOString() : undefined, to: filters.to ? new Date(new Date(filters.to + 'T00:00:00Z').getTime() + 86400000).toISOString() : undefined, page, pageSize: view.path === 'technicians/availability' ? 5 : 20
+    };
+    void analyticsService.read(view, dateParams, controller.signal).then(r => {
+      setResult(r.data);
+      setMeta(r.meta);
+    }).catch(e => {
+      if (!controller.signal.aborted)
+        setError(e.message);
+    }).finally(() => {
+      if (!controller.signal.aborted)
+        setLoading(false);
+    });
+    return () => controller.abort();
+  }, [
+    view, baseView, target, filters, page, refresh
+  ]);
+  const pagination = result && typeof result === 'object' && 'pagination' in result ? result.pagination as {
+    page: number;
+    totalPages: number;
+    totalItems: number;
+  } : null;
+  return <div className="space-y-6 max-w-[1600px] mx-auto">
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <LayoutDashboard className="text-green-600" />Dashboard & Analytics</h1>
+        <p className="text-sm text-slate-500">Authorized database reports. Unavailable values are never replaced with demo numbers.</p>
+      </div>
+      <Button variant="outline" onClick={() => setRefresh(n => n + 1)} disabled={loading}>
+        <RotateCw className="w-4 h-4 mr-2" />Refresh</Button>
+    </div>
+    <div className="flex gap-2 overflow-x-auto border-b border-slate-200">
+      {(departments[user?.role ?? ''] ?? [
+        'overview'
+      ]).map(department => <button key={department} onClick={() => {
+        setSelected(views.find(v => v.department === department)!.path);
+        setPage(1);
+        setTarget('');
+      }} className={'px-4 py-3 text-sm font-semibold whitespace-nowrap ' + (baseView?.department === department ? 'border-b-2 border-green-600 text-green-700' : 'text-slate-500')}>
+        {label(department)}
+      </button>)}
+    </div>
+    <Card>
+      <div className="grid md:grid-cols-3 xl:grid-cols-5 gap-3">
+        <Select label="Report" value={selected} options={views.filter(v => v.department === baseView?.department).map(v => ({
+          value: v.path, label: label(v.label)
+        }))} onChange={e => {
+          setSelected(e.target.value);
+          setPage(1);
+          setTarget('');
+        }} />
+        {baseView?.path.includes(':id') && (selected.includes('customers') ? <PagedRecordSelect label="Customer" selected={selectedCustomer?.id === target ? selectedCustomer : null} load={customerQuery} describe={r => r.name} onChange={r => {
+          setSelectedCustomer(r);
+          setTarget(r?.id ?? '');
+          setPage(1);
+        }} /> : <PagedRecordSelect label="Installation Project" selected={selectedProject?.id === target ? selectedProject : null} load={projectQuery} describe={r => r.reference} onChange={r => {
+          setSelectedProject(r);
+          setTarget(r?.id ?? '');
+          setPage(1);
+        }} />)} {baseView?.filters.includes('from') && <>
+          <Input label="From (UTC)" type="date" value={filters.from} onChange={e => {
+            setFilters({
+              ...filters, from: e.target.value
+            });
+            setPage(1);
+          }} />
+          <Input label="Through (UTC)" type="date" value={filters.to} onChange={e => {
+            setFilters({
+              ...filters, to: e.target.value
+            });
+            setPage(1);
+          }} />
+        </>}
+        {baseView?.filters.includes('currency') && <Select label="Currency" value={filters.currency} options={[
+          {
+            value: '', label: 'Separate currencies'
+          }, ...[
+            'INR', 'USD', 'EUR', 'GBP'
+          ].map(c => ({
+            value: c, label: c
+          }))
+        ]} onChange={e => {
+          setFilters({
+            ...filters, currency: e.target.value
+          });
+          setPage(1);
+        }} />}
+        {baseView?.filters.includes('customerId') && ['admin', 'sales_executive', 'finance_officer'].includes(user?.role ?? '') && <PagedRecordSelect label="Customer Filter" selected={filterCustomer} load={customerQuery} describe={r => r.name} onChange={r => {
+          setFilterCustomer(r);
+          setFilters({
+            ...filters, customerId: r?.id ?? ''
+          });
+          setPage(1);
+        }} />}
+        {baseView?.filters.includes('groupBy') && <Select label="Group By (UTC)" value={filters.groupBy} options={[
+          'day', 'week', 'month'
+        ].map(x => ({
+          value: x, label: label(x)
+        }))} onChange={e => setFilters({
+          ...filters, groupBy: e.target.value
+        })} />} {baseView?.filters.includes('days') && <Input label="Expiry Horizon (days)" type="number" min="1" max="90" value={filters.days} onChange={e => setFilters({
+          ...filters, days: e.target.value
+        })} />}
+      </div>
+      <p className="text-xs text-slate-500 mt-3">
+        {baseView?.filters.includes('from') ? 'Date intervals use UTC; the default is the server-defined report window. Financial balances remain current snapshots of the selected invoice cohort.' : 'This report uses a current snapshot or an explicit expiry horizon; historical date filtering is not available.'}
+      </p>
+    </Card>
+    {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 text-red-800 p-4">
+      {error}
+    </div>}
+    {loading ? <div className="py-16 text-center text-slate-500">Loading actual report data...</div> : result !== null ? <AnalyticsResult value={result} /> : !error && <p className="text-slate-500">Choose an authorized record to view this report.</p>}
+    {pagination && <div className="flex items-center justify-between text-sm">
+      <span>
+        {pagination.totalItems} matching records</span>
+      <div className="flex gap-3">
+        <Button variant="outline" disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>Previous</Button>
+        <span className="py-2">Page {pagination.page} of {pagination.totalPages || 1}
+        </span>
+        <Button variant="outline" disabled={page >= pagination.totalPages || loading} onClick={() => setPage(p => p + 1)}>Next</Button>
+      </div>
+    </div>}
+    {meta && <p className="text-xs text-slate-400">Database snapshot: {new Date(meta.asOf).toLocaleString()} | UTC interval: {meta.from} to {meta.to}
+    </p>}
+  </div>;
 }

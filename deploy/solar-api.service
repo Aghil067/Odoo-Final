@@ -1,0 +1,31 @@
+[Unit]
+Description=Solar Installation Management API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=solar
+Group=solar
+WorkingDirectory=/opt/solar/backend
+EnvironmentFile=/etc/solar/backend.env
+ExecStart=/usr/bin/node dist/src/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/solar/evidence
+
+[Install]
+WantedBy=multi-user.target
