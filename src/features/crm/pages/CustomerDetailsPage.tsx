@@ -23,6 +23,7 @@ import { PermissionGuard } from '../../../components/common/PermissionGuard';
 import { customerService } from '../services/customerService';
 import { enquiryService } from '../services/enquiryService';
 import { followUpService } from '../services/followUpService';
+import {RecordPagination} from '../../../components/common/RecordPagination';
 import {CustomerSites} from '../components/CustomerSites';
 import { ActivityTimeline } from '../components/ActivityTimeline';
 import { FollowUpForm } from '../components/FollowUpForm';
@@ -54,6 +55,7 @@ export function CustomerDetailsPage() {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [activities, setActivities] = useState<CustomerActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error,setError]=useState(''),[refresh,setRefresh]=useState(0),[enquiryPage,setEnquiryPage]=useState(1),[followUpPage,setFollowUpPage]=useState(1),[activityPage,setActivityPage]=useState(1),[enquiryTotal,setEnquiryTotal]=useState(0),[followUpTotal,setFollowUpTotal]=useState(0),[activityTotal,setActivityTotal]=useState(0);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'enquiries' | 'followups' | 'notes'>('overview');
   const [showFollowUpForm, setShowFollowUpForm] = useState(false);
@@ -63,33 +65,34 @@ export function CustomerDetailsPage() {
       if (!id) return;
       try {
         setIsLoading(true);
+        setError('');
         const [c, enqList, fuList, actList] = await Promise.all([
           customerService.getById(id),
-          enquiryService.getByCustomerId(id),
-          followUpService.getByCustomerId(id),
-          customerService.getActivity(id),
+          enquiryService.list({customerId:id,page:enquiryPage,pageSize:10}),
+          followUpService.list({page:followUpPage,pageSize:10},id),
+          customerService.getActivityPage(id,activityPage),
         ]);
         setCustomer(c);
-        setEnquiries(enqList);
-        setFollowUps(fuList);
-        setActivities(actList);
+        setEnquiries(enqList.data);setEnquiryTotal(enqList.total);
+        setFollowUps(fuList.data);setFollowUpTotal(fuList.total);
+        setActivities(actList.data);setActivityTotal(actList.total);
       } catch (err) {
-        console.error('Failed to load customer profile', err);
+        setError(err instanceof Error?err.message:'Customer data is unavailable.');
       } finally {
         setIsLoading(false);
       }
     }
     loadData();
-  }, [id]);
+  }, [id,enquiryPage,followUpPage,activityPage,refresh]);
 
   const handleCreateFollowUp = async (formData: FollowUpFormData) => {
     if (!customer) return;
     try {
-      const created = await followUpService.create({ ...formData, customerId: customer.id });
-      setFollowUps((prev) => [created, ...prev]);
+      await followUpService.create({ ...formData, customerId: customer.id });
+      setFollowUpPage(1);setRefresh(v=>v+1);
       setShowFollowUpForm(false);
     } catch (err) {
-      console.error('Error creating follow up', err);
+      throw err;
     }
   };
 
@@ -102,6 +105,7 @@ export function CustomerDetailsPage() {
     );
   }
 
+  if(error)return <Card><p role="alert" className="text-red-700">{error}</p><Button onClick={()=>setRefresh(v=>v+1)}>Retry Customer Data</Button></Card>;
   if (!customer) {
     return (
       <div className="text-center py-16">
@@ -116,7 +120,7 @@ export function CustomerDetailsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <CustomerSites customerId={customer.id}/>
+      <CustomerSites customerId={customer.id} onChanged={async()=>{setCustomer(await customerService.getById(customer.id));}}/>
       {/* Top Bar Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200">
         <div className="flex items-center gap-3">
@@ -172,7 +176,7 @@ export function CustomerDetailsPage() {
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Enquiries ({enquiries.length})
+          Enquiries ({enquiryTotal})
         </button>
         <button
           onClick={() => setActiveTab('followups')}
@@ -182,7 +186,7 @@ export function CustomerDetailsPage() {
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Follow-ups ({followUps.length})
+          Follow-ups ({followUpTotal})
         </button>
         <button
           onClick={() => setActiveTab('notes')}
@@ -326,6 +330,7 @@ export function CustomerDetailsPage() {
               ))}
             </div>
           )}
+          <RecordPagination page={enquiryPage} pageSize={10} total={enquiryTotal} onChange={setEnquiryPage} label="Enquiries"/>
         </Card>
       )}
 
@@ -382,6 +387,7 @@ export function CustomerDetailsPage() {
               ))}
             </div>
           )}
+          <RecordPagination page={followUpPage} pageSize={10} total={followUpTotal} onChange={setFollowUpPage} label="Follow-ups"/>
         </Card>
       )}
 
@@ -396,6 +402,7 @@ export function CustomerDetailsPage() {
           <Card>
             <CardHeader title="Customer Activity Log" />
             <ActivityTimeline activities={activities} />
+            <RecordPagination page={activityPage} pageSize={10} total={activityTotal} onChange={setActivityPage} label="Activities"/>
           </Card>
         </div>
       )}

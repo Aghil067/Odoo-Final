@@ -182,7 +182,7 @@ export function CRMDashboardPage() {
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-slate-800">{isLoading ? '—' : stats.wonEnquiries}</div>
-          <span className="text-[11px] text-slate-400">Ready for survey/install</span>
+          <span className="text-[11px] text-slate-400">Customer accepted commercial commitments</span>
         </Card>
       </div>
 

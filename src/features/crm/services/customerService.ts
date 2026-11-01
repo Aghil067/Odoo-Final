@@ -10,5 +10,6 @@ export const customerService={
  async update(id:string,data:Partial<CustomerFormData>){if(!data.version)unsupported('Editing without the loaded customer version; refresh first');return mapCustomer(await patchData<CustomerRecord>(`/customers/${id}`,{...body(data as CustomerFormData),version:data.version}));},
  async archive(id:string,version:number){return mapCustomer(await postData<CustomerRecord>(`/customers/${id}/archive`,{version}));},
  async getActivity(id:string):Promise<CustomerActivity[]>{const page=await getPage<{id:string;type:string;description:string;createdAt:string;actor?:{name:string}}>(`/customers/${id}/activities`);return page.data.map(r=>({id:r.id,type:'activity_recorded',description:r.description,performedBy:r.actor?.name??'Recorded actor',timestamp:r.createdAt}));},
+ async getActivityPage(id:string,page=1){const r=await getPage<{id:string;description:string;createdAt:string;actor?:{name:string}}>(`/customers/${id}/activities`,{page,pageSize:10});return {...r,data:r.data.map(row=>({id:row.id,type:'activity_recorded' as const,description:row.description,performedBy:row.actor?.name??'Actor Not Included',timestamp:row.createdAt}))};},
  async getCities(){return getData<string[]>('/crm/cities');}
 };

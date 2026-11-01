@@ -111,6 +111,7 @@ export interface EnquiryFormData {
 }
 
 export interface UpdateEnquiryStatusData {
+  reason?:string;
   version?:number;
   status: EnquiryStatus;
   lostReason?: string;
@@ -119,6 +120,7 @@ export interface UpdateEnquiryStatusData {
 // ─── Filters ────────────────────────────────────────────────────
 
 export interface EnquiryFilters {
+  customerId?:string;
   search?: string;
   status?: EnquiryStatus | '';
   systemType?: SystemType | '';
@@ -209,3 +211,6 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   commercial: 'Commercial',
 };
 
+
+export const CRM_ENQUIRY_STATUSES:EnquiryStatus[]=['new','contacted','qualified','site_survey_pending','lost','disqualified'];
+export const CRM_LEAD_TRANSITIONS:Partial<Record<EnquiryStatus,EnquiryStatus[]>>={new:['contacted','lost','disqualified'],contacted:['qualified','lost','disqualified'],qualified:['site_survey_pending','lost','disqualified'],site_survey_pending:['qualified','lost','disqualified'],lost:['contacted'],disqualified:['contacted']};

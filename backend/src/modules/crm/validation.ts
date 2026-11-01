@@ -20,6 +20,7 @@ export const leadQuery = pageQuery.extend({
 }).strict();
 export const salespersonQuery = pageQuery.extend({ q }).strict();
 export const timelineQuery = pageQuery.strict();
+export const siteQuery = pageQuery.extend({q}).strict();
 
 export function normalizePhone(value: string): string | undefined {
   const phone = parsePhoneNumberFromString(value, { defaultCountry: env.DEFAULT_PHONE_COUNTRY as CountryCode, extract: false });

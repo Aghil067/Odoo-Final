@@ -58,7 +58,7 @@ export function listLeads(user: Principal, query: z.infer<typeof v.leadQuery>) {
     const where: Prisma.LeadWhereInput = { AND: [leadScope(user), {
       status, source, priority, customerId, siteId, assignedToId, preferredSystemType:query.preferredSystemType,createdAt:{gte:query.from?new Date(query.from):undefined,lte:query.to?new Date(query.to):undefined},
       ...(q ? { OR: [
-        { reference: { contains: q, mode: 'insensitive' } }, { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { reference: { contains: q, mode: 'insensitive' } }, { customer: { name: { contains: q, mode: 'insensitive' } } }, { customer: { phone: { contains: q } } },
         { site: { name: { contains: q, mode: 'insensitive' } } }, { qualificationNotes: { contains: q, mode: 'insensitive' } },
       ] } : {}),
     }, ...(followUp ? [{ status: { in: [...openStatuses] }, nextFollowUpAt: followUp === 'scheduled'?{not:null}:followUp==='today'?{gte:new Date(now.toISOString().slice(0,10)+'T00:00:00Z'),lt:new Date(new Date(now.toISOString().slice(0,10)+'T00:00:00Z').getTime()+86400000)}:followUp === 'overdue' ? { lt: now } : { gte: now, lte: new Date(now.getTime() + 7 * 86400_000) } }] : [])] };

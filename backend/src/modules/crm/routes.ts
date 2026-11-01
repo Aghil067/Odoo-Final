@@ -25,7 +25,7 @@ crmRouter.patch('/customers/:id', async (req, res) => {
 crmRouter.post('/customers/:id/archive', async (req, res) => success(res, await customers.archiveCustomer(actor(req), id(req), v.versionInput.parse(req.body).version)));
 crmRouter.get('/customers/:id/activities',async(req,res)=>list(res,await customers.customerActivities(actor(req),id(req),v.timelineQuery.parse(req.query))));
 crmRouter.post('/customers/:id/sites', async (req, res) => success(res, await sites.createSite(actor(req), id(req), v.createSite.parse(req.body)), 201));
-crmRouter.get('/customers/:id/sites', async (req, res) => list(res, await sites.listSites(actor(req), id(req), v.timelineQuery.parse(req.query))));
+crmRouter.get('/customers/:id/sites', async (req, res) => list(res, await sites.listSites(actor(req), id(req), v.siteQuery.parse(req.query))));
 crmRouter.get('/sites/:id', async (req, res) => success(res, await sites.siteDetail(actor(req), id(req))));
 crmRouter.patch('/sites/:id', async (req, res) => success(res, await sites.updateSite(actor(req), id(req), v.updateSite.parse(req.body))));
 

@@ -27,6 +27,7 @@ export interface FollowUp {
 }
 
 export interface FollowUpFormData {
+  reschedule?:boolean;
   version?:number;
   customerId: string;
   enquiryId?: string;
