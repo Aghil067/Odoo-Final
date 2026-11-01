@@ -20,6 +20,12 @@ export function createFinanceRouter(storage:SurveyStorage=new LocalSurveyStorage
  const admin=allowRoles('ADMIN'),finance=allowRoles('ADMIN','FINANCE'),commercial=allowRoles('ADMIN','FINANCE','SALES'),service=allowRoles('ADMIN','FINANCE','SUPPORT');
  const id=(q:Request)=>v.path.parse(q.params).id,child=(q:Request)=>v.path.extend({childId:v.path.shape.id}).parse(q.params),list=(s:Response,result:{data:unknown;pagination:unknown})=>success(s,result.data,200,{pagination:result.pagination});
  const page=v.query.pick({page:true,pageSize:true}),filter=v.query.pick({page:true,pageSize:true,customerId:true,currency:true,q:true}),report=filter.omit({q:true});
+ r.get('/configurations',commercial,async(q,s)=>list(s,await read.configurations(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
+ r.get('/configurations/:id/quotation-source',commercial,async(q,s)=>success(s,await read.configurationSource(actor(q),id(q))));
+ r.get('/quotation-service-sources',commercial,async(q,s)=>list(s,await read.serviceQuoteSources(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
+ r.get('/installations',finance,async(q,s)=>list(s,await read.installations(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
+ r.get('/service-tickets',service,async(q,s)=>list(s,await read.serviceDirectory(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
+ r.get('/people',admin,async(q,s)=>list(s,await read.people(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
  r.get('/customers',finance,async(q,s)=>list(s,await read.customerDirectory(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query))));
  r.get('/summary',finance,async(q,s)=>success(s,await read.summary(actor(q),report.parse(q.query))));
  r.get('/receivables',finance,async(q,s)=>{const result=await read.receivables(actor(q),report.parse(q.query));return success(s,result.data,200,{pagination:result.pagination,scope:result.scope});});
@@ -29,11 +35,13 @@ export function createFinanceRouter(storage:SurveyStorage=new LocalSurveyStorage
  r.get('/access',admin,async(q,s)=>list(s,await read.access(actor(q),page.extend({customerId:v.path.shape.id.optional()}).parse(q.query))));
  r.post('/customers/:id/access',admin,async(q,s)=>success(s,await access.grant(actor(q),id(q),v.grant.parse(q.body)),201));
  r.post('/access/:id/revoke',admin,async(q,s)=>success(s,await access.revoke(actor(q),id(q),v.command.parse(q.body))));
- r.get('/price-books',commercial,async(q,s)=>list(s,await read.catalog(actor(q),page.parse(q.query),'book')));
+ r.get('/price-books',commercial,async(q,s)=>list(s,await read.catalog(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query),'book')));
  r.post('/price-books',admin,async(q,s)=>success(s,await pricing.createBook(actor(q),v.priceBook.parse(q.body)),201));
+ r.get('/price-books/:id',commercial,async(q,s)=>success(s,await read.catalogDetail(actor(q),id(q),'book')));
  r.post('/price-books/:id/deactivate',admin,async(q,s)=>success(s,await pricing.deactivate(actor(q),id(q),'book',v.command.parse(q.body))));
- r.get('/tax-rules',commercial,async(q,s)=>list(s,await read.catalog(actor(q),page.parse(q.query),'tax')));
+ r.get('/tax-rules',commercial,async(q,s)=>list(s,await read.catalog(actor(q),page.extend({q:v.text(160).optional()}).parse(q.query),'tax')));
  r.post('/tax-rules',admin,async(q,s)=>success(s,await pricing.createTax(actor(q),v.taxRule.parse(q.body)),201));
+ r.get('/tax-rules/:id',commercial,async(q,s)=>success(s,await read.catalogDetail(actor(q),id(q),'tax')));
  r.post('/tax-rules/:id/deactivate',admin,async(q,s)=>success(s,await pricing.deactivate(actor(q),id(q),'tax',v.command.parse(q.body))));
  r.post('/pricing/preview',commercial,async(q,s)=>success(s,await financeAtomic(async tx=>pricing.publicCalculation(actor(q),await pricing.calculate(tx,actor(q),v.preview.parse(q.body))))));
  const groups=[['quotations','QUOTATION',commercial],['orders','ORDER',commercial],['invoices','INVOICE',commercial],['payments','PAYMENT',finance],['credit-notes','CREDIT_NOTE',finance],['refunds','REFUND',finance],['expenses','EXPENSE',finance],['service-charges','SERVICE_CHARGE',service]] as const;
