@@ -1,70 +1,92 @@
-/**
- * WarrantyClaimsPage.tsx
- * ─────────────────────────────────────────────────────────────
- * Master Claims Ledger Page in M07: Warranty Management.
- */
-
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Plus, RefreshCw } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import type { WarrantyClaim } from '../types/warrantyClaim.types';
-import { warrantyClaimService } from '../services/warrantyClaimService';
-import { WarrantyClaimTable } from '../components/WarrantyClaimTable';
-
-export const WarrantyClaimsPage: React.FC = () => {
-  const [claims, setClaims] = useState<WarrantyClaim[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadClaims = async () => {
-    try {
-      setIsLoading(true);
-      const res = await warrantyClaimService.list();
-      setClaims(res.data);
-    } catch (err) {
-      console.error('Failed to load warranty claims', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+import { useEffect, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { Input } from '../../../components/ui/Input';
+import { Select } from '../../../components/ui/Select';
+import { Card } from '../../../components/ui/Card';
+import { Button } from '../../../components/ui/Button';
+import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { warrantyClient, claimStates, type WarrantyClaim } from '../services/warrantyClient';
+export function WarrantyClaimsPage() {
+  const { user } = useAuth(), worker = [
+    'admin', 'service_manager'
+  ].includes(user?.role ?? ''), [q, setQ] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1), [rows, setRows] = useState<WarrantyClaim[]>([]), [total, setTotal] = useState(0), [error, setError] = useState(''), [loading, setLoading] = useState(true), [retry, setRetry] = useState(0);
   useEffect(() => {
-    loadClaims();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
-            Warranty Claims Desk
-          </h1>
-          <p className="text-xs text-slate-500">
-            Review hardware defects, verify eligibility checklists, approve replacement units, and track repairs.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={loadClaims}
-            className="p-2 border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-            title="Refresh list"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <Link
-            to="/warranty/claims/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            File New Claim
-          </Link>
-        </div>
-      </div>
-
-      <WarrantyClaimTable claims={claims} isLoading={isLoading} />
+    if (!worker)
+      return;
+    let live = true;
+    setLoading(true);
+    setError('');
+    warrantyClient.claims({
+      q: q || undefined, claimStatus: status || undefined, page, pageSize: 20
+    }).then(r => {
+      if (live) {
+        setRows(r.data);
+        setTotal(r.total);
+      }
+    }).catch(e => {
+      if (live)
+        setError(e.message);
+    }).finally(() => {
+      if (live)
+        setLoading(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [
+    worker, q, status, page, retry
+  ]);
+  if (!worker)
+    return <Navigate to="/warranty/dashboard" replace />;
+  const columns: Column<WarrantyClaim>[] = [
+    {
+      key: 'reference', header: 'Claim', render: r => <Link className="text-green-700 font-semibold" to={'/warranty/claims/' + r.id}>
+        {r.reference}
+      </Link>
+    }, {
+      key: 'reportedIssue', header: 'Reported Issue'
+    }, {
+      key: 'priority', header: 'Priority'
+    }, {
+      key: 'status', header: 'Workflow State'
+    }, {
+      key: 'finalDecision', header: 'Final Decision', render: r => r.finalDecision ?? 'Not Decided'
+    }, {
+      key: 'failureDate', header: 'Reported Failure Date', render: r => r.failureDate?.slice(0, 10) ?? 'Unknown'
+    }
+  ];
+  return <div className="space-y-5">
+    <div className="flex justify-between">
+      <h1 className="text-2xl font-bold">Warranty Claims</h1>
+      <Link to="/warranty/claims/new">
+        <Button>Report Claim</Button>
+      </Link>
     </div>
-  );
-};
-
+    <Card>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <Input label="Find Claim Reference" value={q} onChange={e => {
+          setQ(e.target.value);
+          setPage(1);
+        }} />
+        <Select label="Claim Workflow State" value={status} options={[
+          {
+            value: '', label: 'All States'
+          }, ...claimStates.map(v => ({
+            value: v, label: v.replaceAll('_', ' ')
+          }))
+        ]} onChange={e => {
+          setStatus(e.target.value);
+          setPage(1);
+        }} />
+      </div>
+      <p className="text-sm text-slate-500 mt-2">Advisory eligibility, provider responses and final decisions remain separate records.</p>
+    </Card>
+    {error ? <Card>
+      <p role="alert">
+        {error}
+      </p>
+      <Button onClick={() => setRetry(v => v + 1)}>Retry</Button>
+    </Card> : <DataTable columns={columns} data={rows} isLoading={loading} keyExtractor={r => r.id} page={page} pageSize={20} total={total} onPageChange={setPage} emptyMessage="No authorized warranty claims match." />}
+  </div>;
+}

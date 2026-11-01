@@ -15,6 +15,8 @@ export function createWarrantyRouter(storage:SurveyStorage=new LocalSurveyStorag
  const router=Router();router.use(authenticate,allowRoles('ADMIN','SUPPORT','SALES','TECHNICIAN','FINANCE'),requireCsrf);
  const admin=allowRoles('ADMIN'),cases=allowRoles('ADMIN','SUPPORT'),summaries=allowRoles('ADMIN','SUPPORT','SALES','TECHNICIAN');
  const id=(req:Request)=>v.path.parse(req.params).id,list=(res:Response,r:{data:unknown;pagination:unknown})=>success(res,r.data,200,{pagination:r.pagination});
+ router.get('/installations',summaries,async(req,res)=>list(res,await read.installations(actor(req),v.page.extend({q:v.text(160).optional()}).parse(req.query))));
+ router.get('/assignees',admin,async(req,res)=>list(res,await read.assignees(actor(req),v.page.extend({q:v.text(160).optional(),role:z.enum(['ADMIN','SUPPORT'])}).parse(req.query))));
  router.post('/policies',admin,async(req,res)=>success(res,await policies.createPolicy(actor(req),v.policyCreate.parse(req.body)),201));
  router.get('/policies',cases,async(req,res)=>list(res,await read.policies(actor(req),v.page.extend(v.query.pick({q:true}).shape).parse(req.query))));
  router.get('/policies/:id',cases,async(req,res)=>success(res,await read.policyDetail(actor(req),id(req))));
