@@ -62,8 +62,8 @@ export function CRMDashboardPage() {
           customerService.list({ pageSize: 1 }),
           enquiryService.getDashboardStats(),
           followUpService.getDashboardStats(),
-          customerService.list({ pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc' }),
-          enquiryService.list({ pageSize: 5, sortBy: 'createdAt', sortOrder: 'desc' }),
+          customerService.list({ pageSize: 5 }),
+          enquiryService.list({ pageSize: 5 }),
           followUpService.list({ pageSize: 5, dateFilter: 'upcoming' }),
         ]);
 
@@ -330,4 +330,3 @@ export function CRMDashboardPage() {
     </div>
   );
 }
-

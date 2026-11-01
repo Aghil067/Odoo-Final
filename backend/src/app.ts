@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import {db} from './lib/db.js';
 import { ApiError, errorHandler, requestContext, success } from './lib/http.js';
 import { authRouter, requireTrustedOrigin } from './modules/auth/auth.js';
+import { usersRouter } from './modules/auth/users.js';
 import { crmRouter } from './modules/crm/routes.js';
 import { createSurveyRouter } from './modules/surveys/routes.js';
 import { createInstallationRouter } from './modules/installations/routes.js';
@@ -36,6 +37,7 @@ app.use((req, _res, next) => {
 });
 app.use(express.json({ limit: '32kb' }), cookieParser());
 app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 app.use('/api/surveys', createSurveyRouter());
 app.use('/api/solar', solarRouter);
 app.use('/api/inventory', inventoryRouter);

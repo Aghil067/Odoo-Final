@@ -13,7 +13,7 @@ const DashboardPage=lazy(()=>import('../features/dashboard/DashboardPage').then(
 import { LoginPage } from '../features/auth/pages/LoginPage';
 import { UnauthorizedPage } from '../features/auth/pages/UnauthorizedPage';
 import { NotFoundPage } from '../features/auth/pages/NotFoundPage';
-import { PlaceholderPage } from '../features/placeholders/PlaceholderPage';
+const UsersPage=lazy(()=>import('../features/users/UsersPage').then(module=>({default:module.UsersPage})));
 
 // Module M01: CRM Pages
 const CRMDashboardPage=lazy(()=>import('../features/crm/pages/CRMDashboardPage').then(module=>({default:module.CRMDashboardPage})));
@@ -351,7 +351,7 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: '/users',
-                element: <PlaceholderPage moduleName="User Management" moduleKey="user_management" />,
+                element: <UsersPage />,
               },
             ],
           },
