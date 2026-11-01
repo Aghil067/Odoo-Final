@@ -60,6 +60,9 @@ export function InstallationsPage() {
         <p className="text-sm text-slate-500">Real project execution, equipment receipt and internal commissioning.</p>
       </div>
       <div className="flex gap-2">
+        <Link to="/installations/map">
+          <Button variant="outline">Installation Map</Button>
+        </Link>
         <Link to="/installations/dashboard">
           <Button variant="outline">Dashboard</Button>
         </Link>

@@ -23,11 +23,16 @@ export function InstallationDashboardPage() {
     retry
   ]);
   return <div className="space-y-5">
-    <div className="flex justify-between">
+    <div className="flex justify-between items-center">
       <h1 className="text-2xl font-bold">Installation Dashboard</h1>
-      <Link to="/installations">
-        <Button variant="outline">View Installations</Button>
-      </Link>
+      <div className="flex gap-2">
+        <Link to="/installations/map">
+          <Button variant="primary">Interactive Map</Button>
+        </Link>
+        <Link to="/installations">
+          <Button variant="outline">View Installations</Button>
+        </Link>
+      </div>
     </div>
     <p className="text-sm text-slate-500">Current authorized jobs by execution state. Commissioning is internal verification; it is not utility permission to energize.</p>
     {error ? <Card>

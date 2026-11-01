@@ -10,6 +10,7 @@ import * as execution from './execution.service.js';
 import * as review from './review.service.js';
 import * as read from './read.service.js';
 import * as files from './attachments.service.js';
+import * as mapService from './map.service.js';
 export function createInstallationRouter(storage:SurveyStorage=new LocalSurveyStorage(env.INSTALLATION_STORAGE_DIR,env.INSTALLATION_MAX_FILE_BYTES)){
  const router=Router();router.use(authenticate,allowRoles('ADMIN','TECHNICIAN','SALES','WAREHOUSE','FINANCE'),requireCsrf);
  const id=(req:Request)=>v.path.parse(req.params).id;
@@ -17,6 +18,7 @@ export function createInstallationRouter(storage:SurveyStorage=new LocalSurveySt
  const editors=allowRoles('ADMIN','TECHNICIAN');
  router.get('/assignees',allowRoles('ADMIN'),async(req,res)=>list(res,await read.assignees(actor(req),v.assignees.parse(req.query))));
  router.get('/summary',async(req,res)=>{v.page.pick({}).parse(req.query);return success(res,await read.summary(actor(req)));});
+ router.get('/map',allowRoles('ADMIN','TECHNICIAN','SALES','FINANCE'),async(req,res)=>success(res,await mapService.getInstallationMap(actor(req),v.mapQuery.parse(req.query))));
  router.get('/',async(req,res)=>list(res,await read.listJobs(actor(req),v.list.parse(req.query))));
  router.post('/',allowRoles('ADMIN'),async(req,res)=>success(res,await jobs.createJob(actor(req),v.create.parse(req.body)),201));
  router.get('/:id',async(req,res)=>success(res,await read.detail(actor(req),id(req))));

@@ -58,6 +58,13 @@ export const NAV_ITEMS: NavItem[] = [
     iconName: 'Wrench',
   },
   {
+    id: 'installation_map',
+    label: 'Installation Map',
+    path: '/installations/map',
+    module: 'installations',
+    iconName: 'Map',
+  },
+  {
     id: 'technicians',
     label: 'Technicians',
     path: '/technicians',

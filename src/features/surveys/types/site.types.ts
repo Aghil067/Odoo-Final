@@ -18,6 +18,8 @@ export interface Site {
   state: string;
   pinCode: string;
   country: string;
+  latitude?: number | null;
+  longitude?: number | null;
   propertyType: PropertyType | null;
   contactPersonOnSite: string;
   contactPhoneOnSite: string;
@@ -34,6 +36,8 @@ export interface SiteFormData {
   state: string;
   pinCode: string;
   country?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   propertyType: PropertyType | null;
   contactPersonOnSite: string;
   contactPhoneOnSite: string;

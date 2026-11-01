@@ -20,6 +20,7 @@ import {
   HardHat,
   HeadphonesIcon,
   LayoutDashboard,
+  Map,
   MapPin,
   Menu,
   Package,
@@ -39,6 +40,7 @@ import { useAuth } from '../../features/auth/hooks/useAuth';
 // This keeps navigation.ts free of React imports
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard,
+  Map,
   Users,
   MapPin,
   Sun,

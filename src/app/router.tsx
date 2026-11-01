@@ -69,6 +69,7 @@ const StockOperationDetailsPage=lazy(()=>import('../features/inventory/pages/Sto
 
 // Module M05: Installation Management Pages
 const InstallationDashboardPage=lazy(()=>import('../features/installations/pages/InstallationDashboardPage').then(module=>({default:module.InstallationDashboardPage})));
+const InstallationMapPage=lazy(()=>import('../features/installations/pages/InstallationMapPage').then(module=>({default:module.InstallationMapPage})));
 const InstallationsPage=lazy(()=>import('../features/installations/pages/InstallationsPage').then(module=>({default:module.InstallationsPage})));
 const InstallationCreatePage=lazy(()=>import('../features/installations/pages/InstallationCreatePage').then(module=>({default:module.InstallationCreatePage})));
 const InstallationDetailsPage=lazy(()=>import('../features/installations/pages/InstallationDetailsPage').then(module=>({default:module.InstallationDetailsPage})));
@@ -247,6 +248,7 @@ export const router = createBrowserRouter([
             children: [
               { path: '/installations', element: <InstallationsPage /> },
               { path: '/installations/dashboard', element: <InstallationDashboardPage /> },
+              { path: '/installations/map', element: <InstallationMapPage /> },
               { path: '/installations/new', element: <InstallationCreatePage /> },
               { path: '/installations/schedule', element: <InstallationSchedulePage /> },
               { path: '/installations/:id', element: <InstallationDetailsPage /> },
